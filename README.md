@@ -42,7 +42,11 @@ The simulator was tested on Windows 11 and macOS Sequoia 15.1.1. All functionali
 After checking out this project, launch Unity Hub to run the simulator with the correct version of Unity (currently **2022.3.5f1**).
 
 ## Running a project
-In this projects there are a total of three scenes. All the scenes can be found in `sound-unity/Assets/Scenes`. The first scene is the `MainMenu` 
+In this projects there are a total of three scenes. All the scenes can be found in `sound-unity/Assets/Scenes`. The first scene is the `MainMenu`.
+
+![](ReadmeFiles/figure_1.png)
+![](ReadmeFiles/figure_2.png)
+![](ReadmeFiles/trigger.jpeg)
 
 ## Contact
 If you have any questions or suggestions, feel free to reach out to md_shadab_alam@outlook.com
