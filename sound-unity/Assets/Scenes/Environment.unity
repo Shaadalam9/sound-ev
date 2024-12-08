@@ -10829,7 +10829,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_text: The sound gave me enough information to realise that a vehicle was approaching
-    (0=not enough information, 10=enough information)
+    (0=not enough information, 10=enough information).
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -11735,7 +11735,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -196.99841, y: 325}
+  m_AnchoredPosition: {x: -196.99841, y: 270}
   m_SizeDelta: {x: 330.8, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &525183423
@@ -11758,10 +11758,8 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 'Please press the trigger button only when you feel it is NOT SAFE to cross
-    the road.
-
-    Click to start.'
+  m_text: Start by HOLDING the trigger button. Release the trigger button when it
+    becomes unsafe to cross; press again when safe to cross.
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -11824,7 +11822,7 @@ MonoBehaviour:
   m_VertexBufferAutoSizeReduction: 0
   m_useMaxVisibleDescender: 1
   m_pageToDisplay: 1
-  m_margin: {x: 0, y: 0, z: -151.66264, w: -3.4742355}
+  m_margin: {x: -44.62111, y: 0, z: -182.07286, w: -99.76627}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
   m_hasFontAssetChanged: 0
@@ -20277,7 +20275,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_text: The vehicle sound was easy to notice (0=not easy to notice, 10=easy to
-    notice)
+    notice).
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -20340,7 +20338,7 @@ MonoBehaviour:
   m_VertexBufferAutoSizeReduction: 0
   m_useMaxVisibleDescender: 1
   m_pageToDisplay: 1
-  m_margin: {x: -37.860138, y: 0, z: -180.68565, w: -3.4742355}
+  m_margin: {x: -43.744705, y: 0, z: -180.68565, w: -3.4742355}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
   m_hasFontAssetChanged: 0
@@ -35028,7 +35026,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: The vehicle sound was annoying     (0=not annoying, 10=extremely annoying)
+  m_text: The vehicle sound was annoying      (0=not annoying, 10=extremely annoying).
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -35091,7 +35089,7 @@ MonoBehaviour:
   m_VertexBufferAutoSizeReduction: 0
   m_useMaxVisibleDescender: 1
   m_pageToDisplay: 1
-  m_margin: {x: -75.44075, y: 0, z: -148.82314, w: -3.4742355}
+  m_margin: {x: -69.71869, y: 0, z: -165.7372, w: -3.4742355}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
   m_hasFontAssetChanged: 0

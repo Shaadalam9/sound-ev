@@ -32,6 +32,7 @@ public class ConditionController : MonoBehaviour
     public string writeFileName = "a";       //write the name of the file for storing the data into----------a for standard
     public string writeFilePath = "";           //where the file will be saved
 
+
     //------------for writing
 
     private float initialHeight;
@@ -316,7 +317,6 @@ public class ConditionController : MonoBehaviour
 
         StartCoroutine(UI_duration(duration));
         initialHeight = Camera.main.transform.position.y;
-        // Question1();
     }
 
     void LoadAndPlaySound(string soundName, int videoDuration)
@@ -365,6 +365,7 @@ public class ConditionController : MonoBehaviour
 
     private void FixedUpdate()
     {
+        
         Vector3 currentPosition = Camera.main.transform.position;
         if (Mathf.Abs(currentPosition.y - initialHeight) > 0.01f)  // Adjust the threshold as needed
         {
@@ -652,6 +653,7 @@ public class ConditionController : MonoBehaviour
         }
 
     }
+
     public ToggleGroup toggleGroup, toggleGroup1;
     private Toggle toggle, toggle1;
     public List<string> mainData = new List<string>();
@@ -867,9 +869,9 @@ private void UpdateInputDataDisplay()
     if (write_data == true) // Time to write data as a scene ends
     {
         // Use a writing data function with video name
-
+        
         name = trials[conditionCounter].video_id; // The current video name
-        filePath = Application.dataPath + "/" + name + ".csv";
+        filePath = Application.dataPath + "/" + writeFileName + "_" + name + ".csv";
 
         using (TextWriter tw = new StreamWriter(filePath, false))
         {
