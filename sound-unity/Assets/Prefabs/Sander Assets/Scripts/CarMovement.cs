@@ -132,6 +132,10 @@ public class CarMovement : MonoBehaviour
 
     public void FixedUpdate()
     {      
+        if (conditionScript.firstScreen.activeSelf)
+    {
+        return; // Do not execute FixedUpdate logic if firstScreen is active
+    }
         fixedDeltaTime = Time.time - startTime;
         pedestrian1_distance = Vector3.Distance(distance_cube.transform.position, conditionScript.p1_object.transform.position);
         pedestrian2_distance = Vector3.Distance(distance_cube.transform.position, conditionScript.p2_object.transform.position);
@@ -244,6 +248,10 @@ public class CarMovement : MonoBehaviour
     
     public void DriveCar()
     {
+        if (conditionScript.firstScreen.activeSelf)
+    {
+        return; // Do not execute FixedUpdate logic if firstScreen is active
+    }
         if (Yield > 0)
         {
             if (Yield == 1)
@@ -337,4 +345,3 @@ public class CarMovement : MonoBehaviour
         }
     }
 }
-

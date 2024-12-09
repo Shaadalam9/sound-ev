@@ -88,6 +88,7 @@ public class ConditionController : MonoBehaviour
     public GameObject black_canvas;  // canvas to be shown as black screen
     public AudioSource carAudioSource; // Reference to the car's AudioSource
     private AudioClip currentClip;
+    public GameObject firstScreen;
 
     public void Start()
     {
@@ -95,7 +96,7 @@ public class ConditionController : MonoBehaviour
         string filePath = Application.dataPath + "/../../mapping.csv";
         ShuffleCSVFile();
 
-        writeFilePath = Application.dataPath +"/" +  writeFileName + DateTime.Now.ToString("yyyyMMdd_HHmmss") +  ".csv";            //the path to stroe the files with the given filename(change it for unique files)
+        writeFilePath = Application.dataPath +"/" +  writeFileName + "_" + conditionCounter +"_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") +  ".csv";            //the path to stroe the files with the given filename(change it for unique files)
 
         if (File.Exists(writeFilePath))
         {
@@ -129,30 +130,37 @@ public class ConditionController : MonoBehaviour
         // Read the CSV lines into a list
         var lines = File.ReadAllLines(filePath).ToList();
 
-        if (lines.Count <= 2)
+        if (lines.Count <= 3)
         {
             Debug.LogError("The CSV file does not have enough rows to shuffle.");
             return;
         }
 
         // Separate the header (first line) and the data rows
-        var header = lines[0];  // Keep the header as is
-        var firstRow = lines[1];  // The first data row (you mentioned this should not be shuffled)
-        var data = lines.Skip(2).ToList();  // All rows after the first two rows
+        var firstThreeRows = lines.Take(3).ToList();
+
+        var data = lines.Skip(3).ToList();  // All rows after the first three rows
 
         // Shuffle the remaining rows using System.Random (explicitly qualified)
         System.Random rand = new System.Random(42);  // Set seed for reproducibility
         var shuffledData = data.OrderBy(x => rand.Next()).ToList();
 
         // Concatenate the header, first row, and shuffled data
-        var result = new List<string> { header, firstRow }.Concat(shuffledData).ToList();
+        var result = firstThreeRows.Concat(shuffledData).ToList();
 
         // Save the shuffled result back to the CSV file
         File.WriteAllLines(filePath, result);
 
         Debug.Log("CSV rows have been shuffled and saved to: " + filePath);
     }
+    public void infoScreen()     //call this after the starting of first scene
+    {
+        firstScreen.SetActive(true);
+        // Time.timeScale = 0f; // Pause the game by setting time scale to 0
 
+        Debug.Log("Info triggered--------------");
+
+    }
 
     public IEnumerator ActivatorVR(string YESVR)
     {
@@ -305,8 +313,16 @@ public class ConditionController : MonoBehaviour
             Debug.Log("Wrong value for camera given.");
         }
 
-        LoadAndPlaySound(soundName, duration);
+        if (conditionCounter != 0)
+        {
+            LoadAndPlaySound(soundName, duration);
+        }
 
+        if (conditionCounter == 0)
+        {
+            infoScreen();
+        }
+        
         // Show black screen for 1 s
         StartCoroutine(BlackScreen(1f));
         // Start trial
@@ -315,7 +331,11 @@ public class ConditionController : MonoBehaviour
 
         startNextStage = false;                             //-------next stage stops and waits for the input
 
-        StartCoroutine(UI_duration(duration));
+        if (conditionCounter != 0)
+        {   
+            StartCoroutine(UI_duration(duration));
+        }
+
         initialHeight = Camera.main.transform.position.y;
     }
 
@@ -596,17 +616,25 @@ public class ConditionController : MonoBehaviour
     public bool startNextStage = false;
     public void Question1()     //call this after the end of every frame
     {
-        Q1.SetActive(true);
+        if (conditionCounter != 0)
+        {
+            Q1.SetActive(true);
         // Time.timeScale = 0f; // Pause the game by setting time scale to 0
 
         Debug.Log("Question 1 triggered--------------");
         //take the experiment number and put it as an array number
         answer_element = conditionCounter;
+        }
+        else
+        {
+            start_study.SetActive(true);
+        }
 
     }
 
     public void Question2()     //call this on the press of next button on q1
     {
+
 
         Q1.SetActive(false);
 
@@ -690,6 +718,14 @@ public class ConditionController : MonoBehaviour
         startNextStage = true;
 
         writeCSV();
+
+    }
+
+    public void stop_screen3()
+    {
+        Debug.Log("Waiting time initialised.............");
+
+        firstScreen.SetActive(false);
 
     }
     private InputData _inputData;
