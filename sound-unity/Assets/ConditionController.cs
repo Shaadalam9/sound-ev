@@ -110,15 +110,13 @@ public class ConditionController : MonoBehaviour
             Debug.LogError("Failed to copy the CSV file: " + e.Message);
         }
 
-        writeFilePath = Application.dataPath +"/" +  writeFileName + "_" + conditionCounter +"_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") +  ".csv";            //the path to store the files with the given filename(change it for unique files)
+        writeFilePath = Application.dataPath +"/" +  writeFileName  +"_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") +  ".csv";            //the path to store the files with the given filename(change it for unique files)
 
         if (File.Exists(writeFilePath))
         {
             Debug.Log("File already exists, deleting...");
             File.Delete(writeFilePath);
         }
-
-        
 
         Debug.Log("Start");
         
@@ -442,7 +440,7 @@ public class ConditionController : MonoBehaviour
     private void SaveAllCSVFiles()
     {
         // Define the target folder path
-        string targetFolderPath = Path.Combine(Application.dataPath, "../../data/" + writeFileName);
+        string targetFolderPath = Path.Combine(Application.dataPath, "../../data/" + writeFileName + "_" + DateTime.Now.ToString("yyyyMMdd_HHmmss"));
 
         // Check if the folder exists, and create it if it doesn't
         if (!Directory.Exists(targetFolderPath))

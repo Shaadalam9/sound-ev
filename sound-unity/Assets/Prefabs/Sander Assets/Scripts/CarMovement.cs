@@ -227,7 +227,7 @@ public class CarMovement : MonoBehaviour
             }
             else
             {
-                yield return new WaitForSecondsRealtime(12f);
+                yield return new WaitForSecondsRealtime(0.01f);
                 if (carCount < yieldArray.Length)
                 {
                     AudioBeep.Play();
