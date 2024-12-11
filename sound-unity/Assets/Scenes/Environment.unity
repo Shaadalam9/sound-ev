@@ -9709,7 +9709,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 22d0e52bf168849489e7c0b22ffccc8e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  writeFileName: Participant_112
+  writeFileName: Participant_4
   writeFilePath: 
   conditionFinished: 0
   LEDBumperObject: {fileID: 566537598739974183}
@@ -39778,7 +39778,7 @@ AudioSource:
   OutputAudioMixerGroup: {fileID: 0}
   m_audioClip: {fileID: 8300000, guid: adb5d059655e24bb6b8c66b13fc635d9, type: 3}
   m_PlayOnAwake: 1
-  m_Volume: 0.3
+  m_Volume: 0.05
   m_Pitch: 1
   Loop: 1
   Mute: 0
