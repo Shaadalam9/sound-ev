@@ -93,20 +93,25 @@ The project is divided into three main scenes, located in the directory: `sound-
 
 
 ### **Participant ID Setup**:  
-   Before starting the experiment, you must configure the participant's unique ID. This can be done by:
-   - Navigating to the `ConditionController` in the **Hierarchy** tab.
-   - Filling in the `Write File Name` field with the participant's unique name or number.
+Before starting the experiment, configure the participant's unique ID:
 
-   Once this is complete, click the **Play** button to enter play mode.
+1. **Open the Environment Scene**
+   - Navigate to **Assets > Scenes**.
+   - Select the **Environment** scene.
+   - ![Environment](ReadmeFiles/environment_menu.png)
 
-   ![Setup Instructions](ReadmeFiles/fig_1.png)
+2. **Modify the ConditionController**
+   - Locate the `ConditionController` in the **Hierarchy** tab.
+   - Fill in the `Write File Name` field with the participant's unique name or ID.
+   - ![Setup Instructions](ReadmeFiles/fig_1.png)
 
 
 ### **Connecting to Quest Link and Launching Unity**:
 Set up the Unity environment and connect it to the Quest using the following steps:
 
 1. **Launch Unity**
-   - Ensure that Unity is open on your computer and the **Main Menu** environment is loaded.
+   - Ensure that Unity is open on your computer and the **MainMenu** environment is loaded.
+   - ![MainMenu](ReadmeFiles/main_menu.png)
 
 2. **Open Quest Link**
    - Navigate to the **Settings** menu and select Quest Link via Meta Quest.
@@ -128,6 +133,13 @@ Set up the Unity environment and connect it to the Quest using the following ste
 6. **Participant Instructions**
    - Have the participant wear the headset.
    - Allow them to read the on-screen instructions before proceeding with the experiment.
+
+7. **Resolving Overlapping Menus**
+   - If another menu appears in front of the instructions:
+     - ![Error](ReadmeFiles/error.png)
+     - Press the Meta button on the right controller to resolve the issue.
+     - ![Debug](ReadmeFiles/debug.png)
+
 
 ---
 
