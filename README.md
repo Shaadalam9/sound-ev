@@ -54,9 +54,34 @@ The project is divided into three main scenes, located in the directory: `sound-
 3. **EndMenu**:  
    - The final scene serves as a thank-you screen, providing closure to the experiment.
 
-### Setup Instructions
+## Setup Instructions
 
-1. **Participant ID Setup**:  
+### **Adjusting Participant Height**:
+   To adjust the participant's height:
+
+1. Open the **Quick Settings** menu.
+   ![Quick Settings](ReadmeFiles/setting_nav.jpg)
+
+2. Navigate to the **Physical Space** option.
+   ![Physical Space](ReadmeFiles/physical_space.png)
+
+3. Select **Clear Boundary and Space Scan History** to reset the environment settings.
+   ![Clear Boundary](ReadmeFiles/clear_boundary.png)
+
+4. Click on **Set Floor Level** and ensure the floor level is correctly set.
+   ![Set Floor](ReadmeFiles/floor_level.png)
+
+5. Go back to the **Quick Settings** menu and select **Boundary**.
+   ![Boundary](ReadmeFiles/boundary.png)
+
+6. Instruct the participant to look down at their shoes to ensure correct orientation and alignment.
+
+
+7. Ask the participant to press **Confirm Boundary** to finalize the setup.
+   ![Confirm](ReadmeFiles/stationary_boundary.png)
+
+
+### **Participant ID Setup**:  
    Before starting the experiment, you must configure the participant's unique ID. This can be done by:
    - Navigating to the `ConditionController` in the **Hierarchy** tab.
    - Filling in the `Write File Name` field with the participant's unique name or number.
