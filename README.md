@@ -57,28 +57,39 @@ The project is divided into three main scenes, located in the directory: `sound-
 ## Setup Instructions
 
 ### **Adjusting Participant Height**:
-   To adjust the participant's height:
+   Follow these steps to properly adjust the participant's height:
 
-1. Open the **Quick Settings** menu.
-   ![Quick Settings](ReadmeFiles/setting_nav.jpg)
+1. **Open the Settings Menu**
+   - Access the **Settings** menu.
+   - ![Quick Settings](ReadmeFiles/setting_nav.jpg)
 
-2. Navigate to the **Physical Space** option.
-   ![Physical Space](ReadmeFiles/physical_space.png)
+2. **Navigate to Physical Space**
+   - Select the **Physical Space** option.
+   - ![Physical Space](ReadmeFiles/physical_space.png)
 
-3. Select **Clear Boundary and Space Scan History** to reset the environment settings.
-   ![Clear Boundary](ReadmeFiles/clear_boundary.png)
+3. **Clear Boundary and Space Scan History**
+   - Choose the option **Clear Boundary and Space Scan History** to reset any previous environment settings.
+   - ![Clear Boundary](ReadmeFiles/clear_boundary.png)
 
-4. Click on **Set Floor Level** and ensure the floor level is correctly set.
-   ![Set Floor](ReadmeFiles/floor_level.png)
+4. **Set Floor Level**
+   - Click on **Set Floor Level** and adjust it to ensure the floor level is correctly calibrated.
+   - ![Set Floor](ReadmeFiles/floor_level.png)
 
-5. Go back to the **Quick Settings** menu and select **Boundary**.
-   ![Boundary](ReadmeFiles/boundary.png)
+5. **Set Boundary with Participant**
+   - Return to the **Quick Settings** menu and have the participant wear the headset.
+   - Instruct the participant to select **Boundary** from the menu.
+   - ![Boundary](ReadmeFiles/boundary.png)
 
-6. Instruct the participant to look down at their shoes to ensure correct orientation and alignment.
+6. **Ensure Correct Orientation**
+   - Guide the participant to look down at their shoes to verify correct alignment and orientation.
 
+7. **Confirm Boundary**
+   - Ask the participant to press **Confirm Boundary** to finalize the setup.
+   - ![Confirm Boundary](ReadmeFiles/stationary_boundary.png)
 
-7. Ask the participant to press **Confirm Boundary** to finalize the setup.
-   ![Confirm](ReadmeFiles/stationary_boundary.png)
+8. **Hand Over Control**
+   - Once the boundary is confirmed, the experimenter can take back the controller and headset.
+
 
 
 ### **Participant ID Setup**:  
@@ -89,6 +100,34 @@ The project is divided into three main scenes, located in the directory: `sound-
    Once this is complete, click the **Play** button to enter play mode.
 
    ![Setup Instructions](ReadmeFiles/fig_1.png)
+
+
+### **Connecting to Quest Link and Launching Unity**:
+Set up the Unity environment and connect it to the Quest using the following steps:
+
+1. **Launch Unity**
+   - Ensure that Unity is open on your computer and the **Main Menu** environment is loaded.
+
+2. **Open Quest Link**
+   - Navigate to the **Settings** menu and select Quest Link via Meta Quest.
+   - ![Quest Link](ReadmeFiles/Quest_link.png)
+
+3. **Add Desktop Panel**
+   - In Quest Link, click on **Add Desktop Panel**.
+   - ![Add Desktop Panel](ReadmeFiles/add_desktop_panel.png)
+
+4. **Select Unity**
+   - Choose Unity from the available options in the desktop panel.
+   - ![Select Unity](ReadmeFiles/select_unity.png)
+
+5. **Verify Main Menu Scene**
+   - Ensure the Main Menu scene is visible in the Quest.
+   - Press the **Play** button in Unity to start the experiment.
+   - ![Play Button](ReadmeFiles/play_button.png)
+
+6. **Participant Instructions**
+   - Have the participant wear the headset.
+   - Allow them to read the on-screen instructions before proceeding with the experiment.
 
 ---
 
