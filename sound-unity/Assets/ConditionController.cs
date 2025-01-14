@@ -156,7 +156,7 @@ public class ConditionController : MonoBehaviour
         var data = lines.Skip(3).ToList();  // All rows after the first three rows
 
         // Shuffle the remaining rows using System.Random (explicitly qualified)
-        System.Random rand = new System.Random(42);  // Set seed for reproducibility
+        System.Random rand = new System.Random();  // Set seed for reproducibility
         var shuffledData = data.OrderBy(x => rand.Next()).ToList();
 
         // Concatenate the header, first row, and shuffled data
