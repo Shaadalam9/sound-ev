@@ -16,8 +16,8 @@ template = common.get_configs("plotly_template")
 readings_folder = common.get_configs("data")  # new location of the csv file with participant id
 mapping = pd.read_csv(common.get_configs("mapping"))  # mapping file
 directory_path = common.get_configs("output")
-first_csv = common.get_configs("input_csv")   # Intake questionairre
-last_csv = common.get_configs("post_input_csv")  # Post-experiment questionairre
+first_csv = common.get_configs("input_csv")   # Intake questionnaire
+last_csv = common.get_configs("post_input_csv")  # Post-experiment questionnaire
 
 try:
     # Check if the directory already exists
