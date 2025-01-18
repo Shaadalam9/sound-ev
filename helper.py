@@ -4,8 +4,9 @@ import plotly.graph_objects as go
 import plotly.io as pio
 import pycountry
 import math
-import glob
-import shutil  # Added for moving files
+from collections import defaultdict
+# For OneEuroFilter, see https://github.com/casiez/OneEuroFilter
+from OneEuroFilter import OneEuroFilter
 import common
 from custom_logger import CustomLogger
 import re
@@ -13,6 +14,10 @@ from PIL import Image
 import requests
 from io import BytesIO
 import base64
+import numpy as np
+from scipy.stats import ttest_rel, ttest_ind, f_oneway
+from statsmodels.stats.anova import anova_lm
+from statsmodels.formula.api import ols 
 
 logger = CustomLogger(__name__)  # use custom logger
 template = common.get_configs("plotly_template")
@@ -60,457 +65,266 @@ class HMD_helper:
         except LookupError:
             return None  # Return None if country not found
 
-    def move_csv_files(self, participant_no, mapping):
-        # Get the readings directory and create a folder inside it named after the participant_no
-        readings_folder = common.get_configs("readings")
-        participant_folder = os.path.join(readings_folder, str(participant_no))
+    def smoothen_filter(self, signal, type_flter='OneEuroFilter'):
+        """Smoothen list with a filter.
 
-        # Check if the participant folder exists; if not, create it
-        if not os.path.exists(participant_folder):
-            os.makedirs(
-                participant_folder
-            )  # Use makedirs to ensure all directories are created
-            print(f"Folder '{participant_folder}' created.")
+        Args:
+            signal (list): input signal to smoothen
+            type_flter (str, optional): type_flter of filter to use.
+
+        Returns:
+            list: list with smoothened data.
+        """
+        if type_flter == 'OneEuroFilter':
+            filter_kp = OneEuroFilter(freq=common.get_configs('freq'),            # frequency
+                                      mincutoff=common.get_configs('mincutoff'),  # minimum cutoff frequency
+                                      beta=common.get_configs('beta'))            # beta value
+            return [filter_kp(value) for value in signal]
         else:
-            print(f"Folder '{participant_folder}' already exists.")
+            logger.error('Specified filter {} not implemented.', type_flter)
+            return -1
 
-        # Data folder where CSV files are originally located
-        data_folder_path = common.get_configs("data")
+    def ttest(self, signal_1, signal_2, type='two-sided', paired=True):
+        """
+        Perform a t-test on two signals, computing p-values and significance.
 
-        # Move the specific "participants...csv" file
-        participant_file_pattern = os.path.join(
-            data_folder_path, f"{participant_no}*.csv"
-        )
-        participant_files = glob.glob(participant_file_pattern)
+        Args:
+            signal_1 (list): First signal, a list of numeric values.
+            signal_2 (list): Second signal, a list of numeric values.
+            type (str, optional): Type of t-test to perform. Options are "two-sided",
+                                  "greater", or "less". Defaults to "two-sided".
+            paired (bool, optional): Indicates whether to perform a paired t-test
+                                     (`ttest_rel`) or an independent t-test (`ttest_ind`).
+                                     Defaults to True (paired).
 
-        if participant_files:
-            for participant_file in participant_files:
-                dest_file = os.path.join(
-                    participant_folder, os.path.basename(participant_file)
-                )
-                shutil.move(participant_file, dest_file)
-                print(f"Moved '{participant_file}' to '{dest_file}'.")
-        else:
-            print(f"No file matching '{participant_no}*.csv' found.")
-
-        # Iterate over video IDs in the mapping to move corresponding CSV files
-        for video_id in mapping["video_id"]:
-            src_file = os.path.join(data_folder_path, f"{video_id}.csv")
-            dest_file = os.path.join(participant_folder, f"{video_id}.csv")
-
-            if os.path.exists(src_file):
-                shutil.move(src_file, dest_file)
-                print(f"Moved '{src_file}' to '{dest_file}'.")
+        Returns:
+            list: A list containing two elements:
+                  - p_values (list): Raw p-values for each bin.
+                  - significance (list): Binary flags (0 or 1) indicating whether
+                    the p-value for each bin is below the threshold configured in
+                    `tr.common.get_configs('p_value')`.
+        """
+        # Check if the lengths of the two signals are the same
+        if len(signal_1) != len(signal_2):
+            logger.error('The lengths of signal_1 and signal_2 must be the same.')
+            return -1
+        # convert to numpy arrays if signal_1 and signal_2 are lists
+        signal_1 = np.asarray(signal_1)
+        signal_2 = np.asarray(signal_2)
+        p_values = []  # record raw p value for each bin
+        significance = []  # record binary flag (0 or 1) if p value < tr.common.get_configs('p_value'))
+        # perform t-test for each value (treated as an independent bin)
+        for i in range(len(signal_1)):
+            if paired:
+                t_stat, p_value = ttest_rel([signal_1[i]], [signal_2[i]], axis=-1, alternative=type)
             else:
-                print(f"File '{src_file}' does not exist.")
+                t_stat, p_value = ttest_ind([signal_1[i]], [signal_2[i]], axis=-1, alternative=type, equal_var=False)
+            # record raw p value
+            p_values.append(p_value)
+            # determine significance for this value
+            significance.append(int(p_value < common.get_configs('p_value')))
+        # return raw p values and binary flags for significance for output
+        return [p_values, significance]
+
+    def anova(self, signals):
+        """
+        Perform an ANOVA test on three signals, computing p-values and significance.
+
+        Args:
+            signal_1 (list): First signal, a list of numeric values.
+            signal_2 (list): Second signal, a list of numeric values.
+            signal_3 (list): Third signal, a list of numeric values.
+
+        Returns:
+            list: A list containing two elements:
+                  - p_values (list): Raw p-values for each bin.
+                  - significance (list): Binary flags (0 or 1) indicating whether
+                    the p-value for each bin is below the threshold configured in
+                    `tr.common.get_configs('p_value')`.
+        """
+        # check if the lengths of the three signals are the same
+        # convert signals to numpy arrays if they are lists
+        p_values = []  # record raw p-values for each bin
+        significance = []  # record binary flags (0 or 1) if p-value < tr.common.get_configs('p_value')
+        # perform ANOVA test for each value (treated as an independent bin)
+        transposed_data = list(zip(*signals['signals']))
+        for i in range(len(transposed_data)):
+            f_stat, p_value = f_oneway(*transposed_data[i])
+            # record raw p-value
+            p_values.append(p_value)
+            # determine significance for this value
+            significance.append(int(p_value < common.get_configs('p_value')))
+        # return raw p-values and binary flags for significance for output
+        return [p_values, significance]
+
+    def twoway_anova_kp(self, signal1, signal2, signal3, output_console=True, label_str=None):
+        """Perform twoway ANOVA on 2 independent variables and 1 dependent variable (as list of lists).
+
+        Args:
+            signal1 (list): independent variable 1.
+            signal2 (list): independent variable 2.
+            signal3 (list of lists): dependent variable 1 (keypress data).
+            output_console (bool, optional): whether to print results to console.
+            label_str (str, optional): label to add before console output.
+
+        Returns:
+            df: results of ANOVA
+        """
+        # prepare signal1 and signal2 to be of the same dimensions as signal3
+        signal3_flat = [value for sublist in signal3 for value in sublist]
+        # number of observations in the dependent variable
+        n_observations = len(signal3_flat)
+        # repeat signal1 and signal2 to match the length of signal3_flat
+        signal1_expanded = np.tile(signal1, n_observations // len(signal1))
+        signal2_expanded = np.tile(signal2, n_observations // len(signal2))
+        # create a datafarme with data
+        data = pd.DataFrame({'signal1': signal1_expanded,
+                             'signal2': signal2_expanded,
+                             'dependent': signal3_flat
+                             })
+        # perform two-way ANOVA
+        model = ols('dependent ~ C(signal1) + C(signal2) + C(signal1):C(signal2)', data=data).fit()
+        anova_results = anova_lm(model)
+        # print results to console
+        if output_console and not label_str:
+            print('Results for two-way ANOVA:\n', anova_results.to_string())
+        if output_console and label_str:
+            print('Results for two-way ANOVA for ' + label_str + ':\n', anova_results.to_string())
+        return anova_results
 
     @staticmethod
-    def plot_mean_trigger_value_right(readings_folder, mapping, output_folder, group_titles=None, legend_labels=None):
-        dataframes_dict = {}
-        participants_folders = [
-            f for f in os.listdir(readings_folder)
-            if os.path.isdir(os.path.join(readings_folder, f))
-        ]
+    def group_files_by_video_id(data_folder, video_data):
+        # Read the main CSV to map video_id
+        video_ids = video_data['video_id'].unique()
 
-        # Dictionary to accumulate csv files found in participant folders
-        csv_files_dict = {}
+        grouped_data = defaultdict(list)
 
-        # Search all participant folders for csv files
-        for participant in participants_folders:
-            sample_folder = os.path.join(readings_folder, participant)
-            csv_files = [
-                f for f in os.listdir(sample_folder)
-                if f.startswith("video_") and f.endswith(".csv")
-            ]
-            # Add files to the dictionary to track their presence across participants
-            for csv_file in csv_files:
-                if csv_file not in csv_files_dict:
-                    csv_files_dict[f"{participant}_{csv_file}"] = []
-                csv_files_dict[f"{participant}_{csv_file}"].append(os.path.join(sample_folder, csv_file))
+        # Traverse through the data folder and its subfolders
+        for root, _, files in os.walk(data_folder):
+            for file in files:
+                if file.endswith('.csv'):
+                    # Extract the part of the filename after '_'
+                    file_parts = file.split('_', maxsplit=2)
+                    if len(file_parts) > 2:
+                        file_video_id = file_parts[-1].split('.')[0]  # Extract video_id
+                        if file_video_id in video_ids:
+                            full_path = os.path.join(root, file)
+                            grouped_data[file_video_id].append(full_path)
 
-        # Initialize an empty dictionary to store groups
-        grouped_data = {}
-
-        # Loop through each key in the dictionary
-        for key, value in sorted(csv_files_dict.items(), key=lambda x: int(x[0].split('_video_')[1].split('.')[0])):
-            # Extract the video number from the key
-            video_number = key.split('_video_')[1].split('.')[0]
-
-            # Add the key-value pair to the appropriate group
-            if video_number not in grouped_data:
-                grouped_data[video_number] = []
-            grouped_data[video_number].append({key: value})
-
-        grouped_keys_list = [[list(item.keys())[0] for item in values] for values in grouped_data.values()]
-
-        for jdx, csv_files in enumerate(grouped_keys_list):
-            # Loop through each csv file in the current group
-            for csv_file in csv_files:
-                csv_file_ = "_".join(csv_file.split("_")[-2:])
-                participant_ = "_".join(csv_file.split("_")[:2])
-                file_path = os.path.join(readings_folder, participant_, csv_file_)
-                if os.path.exists(file_path):
-                    df = pd.read_csv(file_path)[["Timestamp", "TriggerValueRight"]]
-
-                    # Get the corresponding video_length from the mapping
-                    video_length = mapping.loc[mapping["video_id"] == csv_file_.rstrip('.csv'),
-                                               "video_length"].values[0]
-                    video_length = video_length / 1000
-
-                    # Filter the DataFrame to only include rows where Timestamp >= 0 and <= video_length
-                    df = df[(df["Timestamp"] >= 0) & (df["Timestamp"] <= video_length)]
-
-                    # Add the DataFrame to the dictionary; create a list if it doesn't exist
-                    if csv_file_ in dataframes_dict:
-                        dataframes_dict[csv_file_].append(df)
-                    else:
-                        dataframes_dict[csv_file_] = [df]
-
-        # Merge DataFrames and calculate the average if needed
-        merged_dataframes = {}
-        for csv_file_, df_list in dataframes_dict.items():
-            if len(df_list) > 1:
-                # Concatenate and then average if there are multiple DataFrames
-                merged_df = pd.concat(df_list).groupby(level=0).mean()
-            else:
-                # If there's only one DataFrame, use it directly
-                merged_df = df_list[0]
-
-            merged_dataframes[csv_file_] = merged_df
-
-        # Get the total number of plots needed (each containing 5 curves)
-        num_plots = len(merged_dataframes) // 5 + (1 if len(merged_dataframes) % 5 != 0 else 0)
-
-        # Iterate over the groups of 5
-        for plot_index in range(num_plots):
-            # Create a new subplot for each group of 5
-            fig = go.Figure()
-
-            # Determine the start and end indices for this group
-            start_idx = plot_index * 5
-            end_idx = min(start_idx + 5, len(merged_dataframes))
-
-            # Add traces for this group
-            for i, (csv_file_, merged_df) in enumerate(list(merged_dataframes.items())[start_idx:end_idx]):
-                fig.add_trace(
-                    go.Scatter(
-                        x=merged_df["Timestamp"],
-                        y=merged_df["TriggerValueRight"],
-                        mode='lines',
-                        name=legend_labels[i],
-                        line=dict(width=3)  # Increase line thickness
-                    )
-                )
-
-            # Update layout for each subplot
-            fig.update_layout(
-                title={
-                    'text': group_titles[plot_index],
-                    'x': 0.5,  # Center the title
-                    'xanchor': 'center',
-                    'yanchor': 'top',
-                    'font': {'size': 20, 'weight': 'bold'}  # Make the title larger and bold
-                },
-                xaxis_title={'text': 'Time (in seconds)', 'font': {'size': 20}},  # Increase x-axis label size
-                yaxis_title={'text': 'Trigger press', 'font': {'size': 20}},  # Increase y-axis label size
-                legend_title=None,
-                template='plotly',
-                xaxis=dict(tickfont=dict(size=20)),  # Increase x-axis tick size
-                yaxis=dict(tickfont=dict(size=20))   # Increase y-axis tick size
-            )
-
-            fig.update_layout(
-                legend=dict(x=0.113, y=0.986, traceorder="normal", font=dict(size=24)))
-
-            # Save the plot
-            base_filename = f"group_{plot_index + 1}_trigger"
-            fig.write_image(os.path.join(output_folder, base_filename + ".eps"), width=1600, height=900, scale=3)
-            fig.write_image(os.path.join(output_folder, base_filename + ".png"), width=1600, height=900, scale=3)
-            fig.write_html(os.path.join(output_folder, base_filename + ".html"))
-            fig.write_image(os.path.join(output_folder, base_filename + ".svg"),
-                            width=1600, height=900, scale=3, format="svg")
-
-            # Show the plot
-            fig.show()
+        return grouped_data
 
     @staticmethod
-    def sort_and_group_videos(grouped_videos):
-        # Initialize a list to store the new grouped videos
-        new_grouped_videos = []
+    def calculate_average_for_column(readings_folder, mapping, column_name):
+        """
+        Calculate the average of values for a given column at each unique timestamp across grouped CSV files,
+        considering only the rows within the range of 0 to video_length / 1000 and rounding timestamps to the
+        nearest multiple of 0.02.
 
-        for group in grouped_videos:
-            # Sort video names numerically by extracting numbers from the video IDs
-            sorted_group = sorted(group, key=lambda x: int(re.findall(r'\d+', x)[0]))
+        Args:
+            readings_folder (dict): Location of the data folder.
+            column_name (str): The name of the column to calculate the average for.
+            mapping (DataFrame): A DataFrame containing the video_id and video_length information.
 
-            # Split the sorted group into subgroups of 5
-            for i in range(0, len(sorted_group), 5):
-                new_grouped_videos.append(sorted_group[i:i+5])
+        Returns:
+            dict: A dictionary where keys are video_ids and values are DataFrames with 'Timestamp' and average values.
+        """
+        timewise_averages = {}
+        grouped_data = HMD_helper.group_files_by_video_id(readings_folder, mapping)
 
-        return new_grouped_videos
+        for video_id, file_paths in grouped_data.items():
+            combined_data = []
+            # Get the corresponding video_length from the mapping
+            video_length_row = mapping.loc[mapping["video_id"] == video_id, "video_length"]
+            if video_length_row.empty:
+                print(f"Video length not found for video_id: {video_id}")
+                continue
 
-    @staticmethod
-    def radar_plot(readings_folder, mapping, output_folder):
-        final_dict = {}  # dictionary to accumate the mean value of the slider bars
-        participants_folders = [
-            f for f in os.listdir(readings_folder)
-            if os.path.isdir(os.path.join(readings_folder, f))
-        ]
-        # Dictionary to accumulate csv files found in participant folders
-        csv_files_dict = {}
+            video_length = video_length_row.values[0] / 1000
 
-        # Search all participant folders for csv files
-        for participant in participants_folders:
-            sample_folder = os.path.join(readings_folder, participant)
-            csv_files = [
-                f for f in os.listdir(sample_folder)
-                if f.startswith("Participant_") and f.endswith(".csv")
-            ]
-            # Add files to the dictionary to track their presence across participants
-            for csv_file in csv_files:
-                if csv_file not in csv_files_dict:
-                    csv_files_dict[f"{csv_file}"] = []
-                csv_files_dict[f"{csv_file}"].append(os.path.join(sample_folder, csv_file))
-
-        # Group videos by unique combinations of the constant information
-        grouped_videos = mapping.groupby(['yielding', 'p1', 'p2', 'camera'])['video_id'].apply(list).tolist()
-        # Filter out groups that contain any 'baseline' videos
-        grouped_videos = [group for group in grouped_videos if not any('baseline' in video for video in group)]
-        new_grouped_videos = HMD_helper.sort_and_group_videos(grouped_videos)
-
-        # Initialize dictionaries to store sums and counts for each column of each video
-        video_sums = {video_name: [0, 0, 0] for video_name in mapping['video_id'].unique()}
-        video_counts = {video_name: 0 for video_name in mapping['video_id'].unique()}
-
-        # Loop through each CSV file (existing code to process files remains the same)
-        for file_name, file_path in csv_files_dict.items():
-            if isinstance(file_path, list) and len(file_path) > 0:
-                file_path = file_path[0]
-
-            if isinstance(file_path, str):
+            for file_path in file_paths:
                 try:
-                    df = pd.read_csv(file_path, header=None)
-                    for video_name in video_sums.keys():
-                        video_rows = df[df[0] == video_name]
-                        for i in range(1, 4):
-                            video_sums[video_name][i-1] += video_rows[i].sum()
-                        video_counts[video_name] += len(video_rows)
+                    # Read the CSV file
+                    df = pd.read_csv(file_path)
+
+                    # Check if the necessary columns exist
+                    if 'Timestamp' in df.columns and column_name in df.columns:
+                        # Filter the DataFrame to only include rows where Timestamp >= 0 and <= video_length
+                        df = df[(df["Timestamp"] >= 0) & (df["Timestamp"] <= video_length)]
+
+                        # Round the Timestamp to the nearest multiple of 0.02
+                        df["Timestamp"] = (df["Timestamp"] / 0.02).round() * 0.02
+
+                        combined_data.append(df[['Timestamp', column_name]])
+
                 except Exception as e:
-                    print(f"Error reading {file_path}: {e}")
+                    print(f"Error processing file {file_path}: {e}")
+
+            if combined_data:
+                # Concatenate all data for the current video_id
+                combined_df = pd.concat(combined_data)
+
+                # Group by 'Timestamp' and calculate the average for the column
+                avg_df = combined_df.groupby('Timestamp', as_index=False)[column_name].mean()
+
+                timewise_averages[video_id] = avg_df
             else:
-                print(f"Invalid file path: {file_path}")
+                timewise_averages[video_id] = pd.DataFrame(columns=['Timestamp', column_name])
 
-        # Calculate averages for each paired group
-        for idx, video_group in enumerate(new_grouped_videos):
-            # Calculate the mean of the first column for this paired group
-            first_column_sum = sum(video_sums[video][0] for video in video_group if video_counts[video] > 0)
-            first_column_count = sum(video_counts[video] for video in video_group if video_counts[video] > 0)
-            first_column_mean = first_column_sum / first_column_count if first_column_count > 0 else None
+        return timewise_averages
 
-            # Calculate the mean of the second column for this paired group
-            second_column_sum = sum(video_sums[video][1] for video in video_group if video_counts[video] > 0)
-            second_column_count = sum(video_counts[video] for video in video_group if video_counts[video] > 0)
-            second_column_mean = second_column_sum / second_column_count if second_column_count > 0 else None
-
-            # Calculate the mean of the third column for this paired group
-            third_column_sum = sum(video_sums[video][2] for video in video_group if video_counts[video] > 0)
-            third_column_count = sum(video_counts[video] for video in video_group if video_counts[video] > 0)
-            third_column_mean = third_column_sum / third_column_count if third_column_count > 0 else None
-
-            # Add the means to the results with a dynamic key
-            group_key_prefix = f'group_{idx+1}'
-            final_dict[f'{group_key_prefix}_first_column_mean'] = first_column_mean
-            final_dict[f'{group_key_prefix}_second_column_mean'] = second_column_mean
-            final_dict[f'{group_key_prefix}_third_column_mean'] = third_column_mean
-
-        # Radar plot categories
-        categories = ['Metric 1', 'Metric 2', 'Metric 3']
-
-        # Create a radar plot
+    def plot_mean_trigger_value_right(self, readings_folder, mapping, output_folder):
+        timewise_avgs = HMD_helper.calculate_average_for_column(readings_folder, mapping, 'TriggerValueRight')
+        # Create a Plotly figure
         fig = go.Figure()
 
-        # Add traces for each group in the radar plot
-        num_groups = len(new_grouped_videos)  # Number of groups to plot
-        for idx in range(num_groups):
-            group_key_prefix = f'group_{idx + 1}'
-
-            # Extract the means for the specified columns
-            values = [
-                final_dict.get(f'{group_key_prefix}_first_column_mean', 0),
-                final_dict.get(f'{group_key_prefix}_second_column_mean', 0),
-                final_dict.get(f'{group_key_prefix}_third_column_mean', 0)
-            ]
-
-            # Add trace
-            fig.add_trace(go.Scatterpolar(
-                r=values,
-                theta=categories,
-                fill='toself',
-                name=group_key_prefix
+        # Iterate through all trials and add traces
+        for trial_name, df in timewise_avgs.items():
+            smoothed_values = self.smoothen_filter(df["TriggerValueRight"].tolist())
+            fig.add_trace(go.Scatter(
+                x=df["Timestamp"],
+                y=smoothed_values,
+                mode='lines',
+                name=trial_name
             ))
 
-        # Set the layout of the radar chart
+        # Update layout for better visualization
         fig.update_layout(
-            polar=dict(
-                radialaxis=dict(
-                    visible=True,
-                    range=[0, 100]  # Adjust based on the metric values, or set dynamically if needed
-                )
-            ),
-            showlegend=True,
-            title="Multi-Trace Radar Plot"
+            title="Mean Trigger Value Right Over Time",
+            xaxis_title="Timestamp (s)",
+            yaxis_title="Trigger Value Right",
+            legend_title="Trials",
+            template=template
         )
 
-        base_filename = "radar"
-        fig.write_image(os.path.join(output_folder, base_filename + ".eps"), width=1600, height=900, scale=3)
-        fig.write_image(os.path.join(output_folder, base_filename + ".png"), width=1600, height=900, scale=3)
-        fig.write_html(os.path.join(output_folder, base_filename + ".html"))
-        fig.write_image(os.path.join(output_folder, base_filename + ".svg"),
-                        width=1600, height=900, scale=3, format="svg")
-
-        # Display the radar plot
+        # Show the plot
         fig.show()
 
-    @staticmethod
-    def plot_yaw_movement(readings_folder, mapping, output_folder, group_titles=None, legend_labels=None):
-        dataframes_dict = {}
-        participants_folders = [
-            f for f in os.listdir(readings_folder)
-            if os.path.isdir(os.path.join(readings_folder, f))
-        ]
+    def plot_yaw_movement(self, readings_folder, mapping, output_folder):
+        timewise_avgs = HMD_helper.calculate_average_for_column(readings_folder, mapping, 'TriggerValueRight')
+        # Create a Plotly figure
+        fig = go.Figure()
 
-        # Dictionary to accumulate csv files found in participant folders
-        csv_files_dict = {}
+        # Iterate through all trials and add traces
+        for trial_name, df in timewise_avgs.items():
+            smoothed_values = self.smoothen_filter(df["TriggerValueRight"].tolist())
+            fig.add_trace(go.Scatter(
+                x=df["Timestamp"],
+                y=smoothed_values,
+                mode='lines',
+                name=trial_name
+            ))
 
-        # Search all participant folders for csv files
-        for participant in participants_folders:
-            sample_folder = os.path.join(readings_folder, participant)
-            csv_files = [
-                f for f in os.listdir(sample_folder)
-                if f.startswith("video_") and f.endswith(".csv")
-            ]
-            # Add files to the dictionary to track their presence across participants
-            for csv_file in csv_files:
-                if csv_file not in csv_files_dict:
-                    csv_files_dict[f"{participant}_{csv_file}"] = []
-                csv_files_dict[f"{participant}_{csv_file}"].append(os.path.join(sample_folder, csv_file))
+        # Update layout for better visualization
+        fig.update_layout(
+            title="Mean Trigger Value Right Over Time",
+            xaxis_title="Timestamp (s)",
+            yaxis_title="Trigger Value Right",
+            legend_title="Trials",
+            template=template
+        )
 
-        # Initialize an empty dictionary to store groups
-        grouped_data = {}
-
-        # Loop through each key in the dictionary
-        for key, value in sorted(csv_files_dict.items(), key=lambda x: int(x[0].split('_video_')[1].split('.')[0])):
-            # Extract the video number from the key
-            video_number = key.split('_video_')[1].split('.')[0]
-
-            # Add the key-value pair to the appropriate group
-            if video_number not in grouped_data:
-                grouped_data[video_number] = []
-            grouped_data[video_number].append({key: value})
-
-        grouped_keys_list = [[list(item.keys())[0] for item in values] for values in grouped_data.values()]
-
-        for jdx, csv_files in enumerate(grouped_keys_list):
-            # Loop through each csv file in the current group
-            for csv_file in csv_files:
-                csv_file_ = "_".join(csv_file.split("_")[-2:])
-                participant_ = "_".join(csv_file.split("_")[:2])
-                file_path = os.path.join(readings_folder, participant_, csv_file_)
-                if os.path.exists(file_path):
-                    df = pd.read_csv(file_path)[["Timestamp", "HMDRotationW", 'HMDRotationX',
-                                                 'HMDRotationY', 'HMDRotationZ']]
-
-                    # Extract quaternion columns and convert to Euler angles
-                    euler_angles = df.apply(lambda row: HMD_helper.quaternion_to_euler(
-                        row['HMDRotationW'], row['HMDRotationX'],
-                        row['HMDRotationY'], row['HMDRotationZ']), axis=1)
-
-                    # Split the tuple into separate columns for roll, pitch, and yaw
-
-                    df[['Roll', 'Pitch', 'Yaw']] = pd.DataFrame(euler_angles.tolist(), index=df.index)
-
-                    # Keep only the 'Timestamp' and 'Yaw' columns
-                    df = df[['Timestamp', 'Yaw']]
-
-                    # Get the corresponding video_length from the mapping
-                    video_length = mapping.loc[mapping["video_id"] == csv_file_.rstrip('.csv'),
-                                               "video_length"].values[0]
-                    video_length = video_length / 1000
-
-                    # Filter the DataFrame to only include rows where Timestamp >= 0 and <= video_length
-                    df = df[(df["Timestamp"] >= 0) & (df["Timestamp"] <= video_length)]
-
-                    # Add the DataFrame to the dictionary; create a list if it doesn't exist
-                    if csv_file_ in dataframes_dict:
-                        dataframes_dict[csv_file_].append(df)
-                    else:
-                        dataframes_dict[csv_file_] = [df]
-
-        # Merge DataFrames and calculate the average if needed
-        merged_dataframes = {}
-        for csv_file_, df_list in dataframes_dict.items():
-            if len(df_list) > 1:
-                # Concatenate and then average if there are multiple DataFrames
-                merged_df = pd.concat(df_list).groupby(level=0).mean()
-            else:
-                # If there's only one DataFrame, use it directly
-                merged_df = df_list[0]
-
-            merged_dataframes[csv_file_] = merged_df
-
-        # Get the total number of plots needed (each containing 5 curves)
-        num_plots = len(merged_dataframes) // 5 + (1 if len(merged_dataframes) % 5 != 0 else 0)
-
-        # Iterate over the groups of 5
-        for plot_index in range(num_plots):
-            # Create a new subplot for each group of 5
-            fig = go.Figure()
-
-            # Determine the start and end indices for this group
-            start_idx = plot_index * 5
-            end_idx = min(start_idx + 5, len(merged_dataframes))
-
-            # Add traces for this group
-            for i, (csv_file_, merged_df) in enumerate(list(merged_dataframes.items())[start_idx:end_idx]):
-                fig.add_trace(
-                    go.Scatter(
-                        x=merged_df["Timestamp"],
-                        y=merged_df["Yaw"],
-                        mode='lines',
-                        name=legend_labels[i],
-                        line=dict(width=3)  # Increase line thickness
-                    )
-                )
-
-            # Update layout for each subplot
-            fig.update_layout(
-                title={
-                    'text': group_titles[plot_index],
-                    'x': 0.5,  # Center the title
-                    'xanchor': 'center',
-                    'yanchor': 'top',
-                    'font': {'size': 20, 'weight': 'bold'}  # Make the title larger and bold
-                },
-                xaxis_title={'text': 'Time (in seconds)', 'font': {'size': 20}},  # Increase x-axis label size
-                yaxis_title={'text': 'Yaw Angle (in radians)', 'font': {'size': 20}},  # Increase y-axis label size
-                legend_title=None,
-                template='plotly',
-                xaxis=dict(tickfont=dict(size=20)),  # Increase x-axis tick size
-                yaxis=dict(tickfont=dict(size=20))   # Increase y-axis tick size
-            )
-
-            fig.update_layout(
-                legend=dict(x=0.113, y=0.986, traceorder="normal", font=dict(size=24)))
-
-            # Save the plot
-            base_filename = f"yaw_group_{plot_index + 1}"
-            fig.write_image(os.path.join(output_folder, base_filename + ".eps"), width=1600, height=900, scale=3)
-            fig.write_image(os.path.join(output_folder, base_filename + ".png"), width=1600, height=900, scale=3)
-            fig.write_html(os.path.join(output_folder, base_filename + ".html"))
-            fig.write_image(os.path.join(output_folder, base_filename + ".svg"),
-                            width=1600, height=900, scale=3, format="svg")
-
-            # Show the plot
-            fig.show()
+        # Show the plot
+        fig.show()
 
     @staticmethod
     def gender_distribution(df, output_folder):
