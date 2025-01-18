@@ -1,4 +1,4 @@
-# Multi-pedestrian interaction with automated vehicle
+# Electric vehicles emitting sound
 Framework for the analysis of different sounds emitted by an automated car while pedestrian is crossing the road.
 
 ## Setup
@@ -28,6 +28,15 @@ Run the code:
 ```command line
 python3 analysis.py
 ```
+
+## Configuration of project
+Configuration of the project needs to be defined in `sound-ev/config`. Please use the `default.config` file for the required structure of the file. If no custom config file is provided, `default.config` is used. The config file has the following parameters:
+* `mapping`: CSV file that contains all data found in the videos.
+* `plotly_template`: template used to make graphs in the analysis.
+* `output`: folder with output.
+* `data`: folder with data.
+* `input_csv`: data from intake questionnaire.
+* `post_input_csv`: data from final questionnaire.
 
 ## Input
 The simulator takes input from Meta Quest controller.
