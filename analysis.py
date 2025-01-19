@@ -16,8 +16,8 @@ template = common.get_configs("plotly_template")
 readings_folder = common.get_configs("data")  # new location of the csv file with participant id
 mapping = pd.read_csv(common.get_configs("mapping"))  # mapping file
 directory_path = common.get_configs("output")
-first_csv = common.get_configs("input_csv")   # Intake questionairre
-last_csv = common.get_configs("post_input_csv")  # Post-experiment questionairre
+intake_questionnaire = common.get_configs("intake_questionnaire")   # intake questionnaire
+post_experiment_questionnaire = common.get_configs("post_experiment_questionnaire")  # post-experiment questionnaire
 
 try:
     # Check if the directory already exists
@@ -44,7 +44,7 @@ legend_labels = ["1m", "2m", "3m", "4m", "5m"]
 
 HMD.plot_mean_trigger_value_right(readings_folder, mapping, output_folder=directory_path)
 HMD.plot_yaw_movement(readings_folder, mapping, output_folder=directory_path)
-# HMD.radar_plot(readings_folder, mapping, output_folder=directory_path)
-# HMD.gender_distribution(first_csv, directory_path)
-# HMD.age_distribution(first_csv, directory_path)
-# HMD.demographic_distribution(first_csv, directory_path)
+HMD.radar_plot(readings_folder, mapping, output_folder=directory_path)
+HMD.gender_distribution(intake_questionnaire, directory_path)
+HMD.age_distribution(intake_questionnaire, directory_path)
+HMD.demographic_distribution(intake_questionnaire, directory_path)
