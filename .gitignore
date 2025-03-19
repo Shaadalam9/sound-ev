@@ -118,3 +118,6 @@ sound-unity/Assets/*.csv
 # Saved files
 /output
 /data
+
+# Dynamic files
+mapping.csv
