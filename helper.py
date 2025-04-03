@@ -552,9 +552,12 @@ class HMD_helper:
         pio.write_html(fig, file=os.path.join(output_folder, base_filename + ".html"), auto_open=True)
 
     @staticmethod
-    def read_slider_data(data_folder, output_folder):
+    def read_slider_data(data_folder, mapping, output_folder):
         participant_data = {}
         all_trials = set()
+        
+        # load mapping file
+        mapping_dict = dict(zip(mapping["video_id"], mapping["sound_clip_name"]))
         
         # iterate over participant folders
         for folder in sorted(os.listdir(data_folder)):
@@ -579,33 +582,38 @@ class HMD_helper:
                     break
         
         # create a sorted list of all trials
-        all_trials = sorted(all_trials, key=lambda x: (x != "test", x))
+        all_trials = sorted([t for t in all_trials if t != "test"], key=lambda x: int(re.search(r'\d+', x).group()))
+        all_trials.insert(0, "test") if "test" in all_trials else None
         
-        # construct the dataframe
-        columns = []
-        for trial in all_trials:
-            columns.extend([f"{trial}_noticeability", f"{trial}_info", f"{trial}_annoyance"])
+        # construct separate dataframes for each slider
+        slider_data = {"noticeability": [], "info": [], "annoyance": []}
         
-        result_data = []
-    
-        for participant_id, df in participant_data.items():
+        for participant_id, df in sorted(participant_data.items()):
             row = {"participant_id": participant_id}
             for trial in all_trials:
                 if trial in df.index:
-                    row[f"{trial}_noticeability"], row[f"{trial}_info"], row[f"{trial}_annoyance"] = df.loc[trial]
+                    row[trial] = df.loc[trial].to_list()
                 else:
-                    row[f"{trial}_noticeability"], row[f"{trial}_info"], row[f"{trial}_annoyance"] = None, None, None
-            result_data.append(row)
+                    row[trial] = [None, None, None]
+            
+            slider_data["noticeability"].append([participant_id] + [vals[0] for vals in row.values() if isinstance(vals, list)])
+            slider_data["info"].append([participant_id] + [vals[1] for vals in row.values() if isinstance(vals, list)])
+            slider_data["annoyance"].append([participant_id] + [vals[2] for vals in row.values() if isinstance(vals, list)])
         
-        result_df = pd.DataFrame(result_data, columns=["participant_id"] + columns)
-
-        # sort dataframe by participant_id
-        result_df = result_df.sort_values(by="participant_id").reset_index(drop=True)
-        
-        # save to csv
-        output_path = os.path.join(output_folder, 'slider_input.csv')
-        result_df.to_csv(output_path, index=False)
-        logger.info(f"Slider data saved to {output_path}")
+        # convert lists to dataframes and rename columns based on mapping file
+        for slider, data in slider_data.items():
+            df = pd.DataFrame(data, columns=["participant_id"] + all_trials)
+            df.rename(columns={trial: mapping_dict.get(trial, trial) for trial in all_trials}, inplace=True)
+            
+            # add average row
+            avg_values = df.iloc[:, 1:].mean(skipna=True)
+            avg_row = pd.DataFrame([["average"] + avg_values.tolist()], columns=df.columns)
+            df = pd.concat([df, avg_row], ignore_index=True)
+            
+            # save each slider dataframe separately
+            output_path = os.path.join(output_folder, f"slider_input_{slider}.csv")
+            df.to_csv(output_path, index=False)
+            logger.info(f"{slider} data saved to {output_path}")
 
     def save_plotly_figure(self, fig, filename, width=1600, height=900, scale=1, save_final=True):
         """Saves a Plotly figure as HTML, PNG, SVG, and EPS formats.

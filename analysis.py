@@ -30,10 +30,10 @@ except Exception as e:
 # Execute analysis
 if __name__ == "__main__":
     logger.info("Analysis started.")
-    HMD.read_slider_data(data_folder, output_folder)
+    HMD.read_slider_data(data_folder, mapping, output_folder)
     HMD.plot_kp(data_folder, mapping, output_folder=output_folder)
     # TODO: same figure as one before
-    HMD.plot_yaw_movement(data_folder, mapping, output_folder=output_folder)
+    # HMD.plot_yaw_movement(data_folder, mapping, output_folder=output_folder)
     # HMD.radar_plot(data_folder, mapping, output_folder=output_folder)
     # HMD.gender_distribution(intake_questionnaire, output_folder)
     # HMD.age_distribution(intake_questionnaire, output_folder)
