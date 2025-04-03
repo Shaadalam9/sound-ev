@@ -184,7 +184,7 @@ The experiment captures and saves data for analysis in the `data` folder. The fo
      A separate CSV file is generated to store responses to the questions asked between trials.
 
 ## Collected data
-[![Keypress](figures/mean_trigger_value.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/mean_trigger_value.html)
+[![Keypress](figures/kp.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/kp.html)
 Mean keypress value.
 
 ## Contact

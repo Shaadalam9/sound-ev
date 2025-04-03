@@ -28,6 +28,7 @@ template = common.get_configs("plotly_template")
 SAVE_PNG = True
 SAVE_EPS = True
 
+
 # TODO: update requirements.txt
 # TODO: Mark the time when the car has started to become visible, started to yield,
 # stopped, started to accelerate and taking a turn finally
@@ -193,9 +194,9 @@ class HMD_helper:
         anova_results = anova_lm(model)
         # print results to console
         if output_console and not label_str:
-            print('Results for two-way ANOVA:\n', anova_results.to_string())
+            logger.info('Results for two-way ANOVA:\n', anova_results.to_string())
         if output_console and label_str:
-            print('Results for two-way ANOVA for ' + label_str + ':\n', anova_results.to_string())
+            logger.info('Results for two-way ANOVA for ' + label_str + ':\n', anova_results.to_string())
         return anova_results
 
     @staticmethod
@@ -237,12 +238,13 @@ class HMD_helper:
         timewise_averages = {}
         grouped_data = HMD_helper.group_files_by_video_id(data_folder, mapping)
 
+        # TODO: use resolution param from config
         for video_id, file_paths in grouped_data.items():
             combined_data = []
             # Get the corresponding video_length from the mapping
             video_length_row = mapping.loc[mapping["video_id"] == video_id, "video_length"]
             if video_length_row.empty:
-                print(f"Video length not found for video_id: {video_id}")
+                logger.info(f"Video length not found for video_id: {video_id}")
                 continue
 
             video_length = video_length_row.values[0] / 1000
@@ -263,7 +265,7 @@ class HMD_helper:
                         combined_data.append(df[['Timestamp', column_name]])
 
                 except Exception as e:
-                    print(f"Error processing file {file_path}: {e}")
+                    logger.error(f"Error processing file {file_path}: {e}")
 
             if combined_data:
                 # Concatenate all data for the current video_id
@@ -278,19 +280,27 @@ class HMD_helper:
 
         return timewise_averages
 
-    def plot_mean_trigger_value_right(self, data_folder, mapping, output_folder, save_file=True):
+    def get_sound_clip_name(self, df, video_id_value):
+        result = df.loc[df["video_id"] == video_id_value, "sound_clip_name"]
+        return result.iloc[0] if not result.empty else None
+
+    def plot_kp(self, data_folder, mapping, output_folder, save_file=True):
         timewise_avgs = HMD_helper.calculate_average_for_column(data_folder, mapping, 'TriggerValueRight')
         # Create a Plotly figure
         fig = go.Figure()
 
         # Iterate through all trials and add traces
         for trial_name, df in timewise_avgs.items():
+            # Ensure 'sound_clip_name' exists in the dataframe
+            legend_name = self.get_sound_clip_name(mapping, trial_name) if "sound_clip_name" in mapping.columns else trial_name
+
+            # TODO: add check for config param for smoothing
             smoothed_values = self.smoothen_filter(df["TriggerValueRight"].tolist())
             fig.add_trace(go.Scatter(
                 x=df["Timestamp"],
                 y=smoothed_values,
                 mode='lines',
-                name=trial_name
+                name=legend_name
             ))
 
         # Update layout for better visualization
@@ -305,7 +315,7 @@ class HMD_helper:
         if save_file:
             # Final adjustments and display
             fig.update_layout(margin=dict(l=10, r=10, t=10, b=10))
-            HMD_helper.save_plotly_figure(fig, 'mean_trigger_value', save_final=True)
+            self.save_plotly_figure(fig, 'kp', save_final=True)
         # open it in localhost instead
         else:
             fig.show()
@@ -337,13 +347,13 @@ class HMD_helper:
         if save_file:
             # Final adjustments and display
             fig.update_layout(margin=dict(l=10, r=10, t=10, b=10))
-            HMD_helper.save_plotly_figure(fig, 'yaw_movement', save_final=True)
+            self.save_plotly_figure(fig, 'yaw_movement', save_final=True)
         # open it in localhost instead
         else:
             fig.show()
 
     @staticmethod
-    def gender_distribution(df, output_folder):
+    def gender_distribution(df, output_folder, save_file=True):
         # Check if df is a string (file path), and read it as a DataFrame if necessary
         if isinstance(df, str):
             df = pd.read_csv(df)
@@ -369,13 +379,17 @@ class HMD_helper:
         )
 
         # Save the figure in different formats
-        base_filename = "gender"
-        fig.write_image(os.path.join(output_folder, base_filename + ".png"), width=1600, height=900, scale=3)
-        fig.write_image(os.path.join(output_folder, base_filename + ".eps"), width=1600, height=900, scale=3)
-        pio.write_html(fig, file=os.path.join(output_folder, base_filename + ".html"), auto_open=True)
-
+        # save file to local output folder
+        if save_file:
+            # Final adjustments and display
+            fig.update_layout(margin=dict(l=10, r=10, t=10, b=10))
+            self.save_plotly_figure(fig, 'gender', save_final=True)
+        # open it in localhost instead
+        else:
+            fig.show()
+    
     @staticmethod
-    def age_distribution(df, output_folder):
+    def age_distribution(df, output_folder, save_file=True):
         # Check if df is a string (file path), and read it as a DataFrame if necessary
         if isinstance(df, str):
             df = pd.read_csv(df)
@@ -410,13 +424,14 @@ class HMD_helper:
             legend_title_text="Age"
         )
 
-        # Save the figure in different formats
-        base_filename = "age"
-        fig.write_image(os.path.join(output_folder, base_filename + ".png"), width=1600, height=900, scale=3)
-        fig.write_image(os.path.join(output_folder, base_filename + ".eps"), width=1600, height=900, scale=3)
-        fig.write_image(os.path.join(output_folder, base_filename + ".svg"),
-                        width=1600, height=900, scale=3, format="svg")
-        pio.write_html(fig, file=os.path.join(output_folder, base_filename + ".html"), auto_open=True)
+        # save file to local output folder
+        if save_file:
+            # Final adjustments and display
+            fig.update_layout(margin=dict(l=10, r=10, t=10, b=10))
+            self.save_plotly_figure(fig, 'age', save_final=True)
+        # open it in localhost instead
+        else:
+            fig.show()
 
     @staticmethod
     def replace_nationality_variations(df):
@@ -557,7 +572,7 @@ class HMD_helper:
             for file in os.listdir(folder_path):
                 file_path = os.path.join(folder_path, file)
                 if re.match(rf'Participant_{participant_id}_\d+_\d+\.csv', file):
-                    df = pd.read_csv(file_path, header=None, names=["trial", "slider1", "slider2", "slider3"])
+                    df = pd.read_csv(file_path, header=None, names=["trial", "noticeability", "info", "annoyance"])
                     df.set_index("trial", inplace=True)
                     participant_data[participant_id] = df
                     all_trials.update(df.index)
@@ -569,7 +584,7 @@ class HMD_helper:
         # construct the dataframe
         columns = []
         for trial in all_trials:
-            columns.extend([f"{trial}_slider1", f"{trial}_slider2", f"{trial}_slider3"])
+            columns.extend([f"{trial}_noticeability", f"{trial}_info", f"{trial}_annoyance"])
         
         result_data = []
     
@@ -577,9 +592,9 @@ class HMD_helper:
             row = {"participant_id": participant_id}
             for trial in all_trials:
                 if trial in df.index:
-                    row[f"{trial}_slider1"], row[f"{trial}_slider2"], row[f"{trial}_slider3"] = df.loc[trial]
+                    row[f"{trial}_noticeability"], row[f"{trial}_info"], row[f"{trial}_annoyance"] = df.loc[trial]
                 else:
-                    row[f"{trial}_slider1"], row[f"{trial}_slider2"], row[f"{trial}_slider3"] = None, None, None
+                    row[f"{trial}_noticeability"], row[f"{trial}_info"], row[f"{trial}_annoyance"] = None, None, None
             result_data.append(row)
         
         result_df = pd.DataFrame(result_data, columns=["participant_id"] + columns)
@@ -592,8 +607,7 @@ class HMD_helper:
         result_df.to_csv(output_path, index=False)
         logger.info(f"Slider data saved to {output_path}")
 
-    @staticmethod
-    def save_plotly_figure(fig, filename, width=1600, height=900, scale=1, save_final=True):
+    def save_plotly_figure(self, fig, filename, width=1600, height=900, scale=1, save_final=True):
         """Saves a Plotly figure as HTML, PNG, SVG, and EPS formats.
 
         Args:
