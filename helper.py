@@ -214,14 +214,14 @@ class HMD_helper:
         return grouped_data
 
     @staticmethod
-    def calculate_average_for_column(readings_folder, mapping, column_name):
+    def calculate_average_for_column(data_folder, mapping, column_name):
         """
         Calculate the average of values for a given column at each unique timestamp across grouped CSV files,
         considering only the rows within the range of 0 to video_length / 1000 and rounding timestamps to the
         nearest multiple of 0.02.
 
         Args:
-            readings_folder (dict): Location of the data folder.
+            data_folder (dict): Location of the data folder.
             column_name (str): The name of the column to calculate the average for.
             mapping (DataFrame): A DataFrame containing the video_id and video_length information.
 
@@ -229,7 +229,7 @@ class HMD_helper:
             dict: A dictionary where keys are video_ids and values are DataFrames with 'Timestamp' and average values.
         """
         timewise_averages = {}
-        grouped_data = HMD_helper.group_files_by_video_id(readings_folder, mapping)
+        grouped_data = HMD_helper.group_files_by_video_id(data_folder, mapping)
 
         for video_id, file_paths in grouped_data.items():
             combined_data = []
@@ -272,8 +272,8 @@ class HMD_helper:
 
         return timewise_averages
 
-    def plot_mean_trigger_value_right(self, readings_folder, mapping, output_folder):
-        timewise_avgs = HMD_helper.calculate_average_for_column(readings_folder, mapping, 'TriggerValueRight')
+    def plot_mean_trigger_value_right(self, data_folder, mapping, output_folder):
+        timewise_avgs = HMD_helper.calculate_average_for_column(data_folder, mapping, 'TriggerValueRight')
         # Create a Plotly figure
         fig = go.Figure()
 
@@ -299,8 +299,8 @@ class HMD_helper:
         # Show the plot
         fig.show()
 
-    def plot_yaw_movement(self, readings_folder, mapping, output_folder):
-        timewise_avgs = HMD_helper.calculate_average_for_column(readings_folder, mapping, 'TriggerValueRight')
+    def plot_yaw_movement(self, data_folder, mapping, output_folder):
+        timewise_avgs = HMD_helper.calculate_average_for_column(data_folder, mapping, 'TriggerValueRight')
         # Create a Plotly figure
         fig = go.Figure()
 
@@ -519,3 +519,60 @@ class HMD_helper:
         fig.write_image(os.path.join(output_folder, base_filename + ".svg"),
                         width=1600, height=900, scale=3, format="svg")
         pio.write_html(fig, file=os.path.join(output_folder, base_filename + ".html"), auto_open=True)
+
+    @staticmethod
+    def read_slider_data(data_folder, output_folder):
+        participant_data = {}
+        all_trials = set()
+        
+        # iterate over participant folders
+        for folder in sorted(os.listdir(data_folder)):
+            folder_path = os.path.join(data_folder, folder)
+            if not os.path.isdir(folder_path):
+                continue
+            
+            # extract participant id
+            match = re.match(r'Participant_(\d+)_', folder)
+            if not match:
+                continue
+            participant_id = int(match.group(1))
+            
+            # find the main csv file containing slider data
+            for file in os.listdir(folder_path):
+                file_path = os.path.join(folder_path, file)
+                if re.match(rf'Participant_{participant_id}_\d+_\d+\.csv', file):
+                    print(file_path, participant_id)
+                    df = pd.read_csv(file_path, header=None, names=["trial", "slider1", "slider2", "slider3"])
+                    df.set_index("trial", inplace=True)
+                    participant_data[participant_id] = df
+                    all_trials.update(df.index)
+                    break
+        
+        # create a sorted list of all trials
+        all_trials = sorted(all_trials, key=lambda x: (x != "test", x))
+        
+        # construct the dataframe
+        columns = []
+        for trial in all_trials:
+            columns.extend([f"{trial}_slider1", f"{trial}_slider2", f"{trial}_slider3"])
+        
+        result_data = []
+    
+        for participant_id, df in participant_data.items():
+            row = {"participant_id": participant_id}
+            for trial in all_trials:
+                if trial in df.index:
+                    row[f"{trial}_slider1"], row[f"{trial}_slider2"], row[f"{trial}_slider3"] = df.loc[trial]
+                else:
+                    row[f"{trial}_slider1"], row[f"{trial}_slider2"], row[f"{trial}_slider3"] = None, None, None
+            result_data.append(row)
+        
+        result_df = pd.DataFrame(result_data, columns=["participant_id"] + columns)
+
+        # sort dataframe by participant_id
+        result_df = result_df.sort_values(by="participant_id").reset_index(drop=True)
+        
+        # save to csv
+        output_path = os.path.join(output_folder, 'slider_input.csv')
+        result_df.to_csv(output_path, index=False)
+        logger.info(f"Slider data saved to {output_path}")

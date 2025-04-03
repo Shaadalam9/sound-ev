@@ -13,18 +13,18 @@ logger = CustomLogger(__name__)  # use custom logger
 HMD = HMD_helper()
 
 template = common.get_configs("plotly_template")
-readings_folder = common.get_configs("data")  # new location of the csv file with participant id
+data_folder = common.get_configs("data")  # new location of the csv file with participant id
 mapping = pd.read_csv(common.get_configs("mapping"))  # mapping file
-directory_path = common.get_configs("output")
+output_folder = common.get_configs("output")
 intake_questionnaire = common.get_configs("intake_questionnaire")   # intake questionnaire
 post_experiment_questionnaire = common.get_configs("post_experiment_questionnaire")  # post-experiment questionnaire
 
 try:
     # Check if the directory already exists
-    if not os.path.exists(directory_path):
+    if not os.path.exists(output_folder):
         # Create the directory
-        os.makedirs(directory_path)
-        print(f"Directory '{directory_path}' created successfully.")
+        os.makedirs(output_folder)
+        print(f"Directory '{output_folder}' created successfully.")
 except Exception as e:
     print(f"Error occurred while creating directory: {e}")
 
@@ -42,9 +42,10 @@ group_titles = [
 
 legend_labels = ["1m", "2m", "3m", "4m", "5m"]
 
-HMD.plot_mean_trigger_value_right(readings_folder, mapping, output_folder=directory_path)
-HMD.plot_yaw_movement(readings_folder, mapping, output_folder=directory_path)
-HMD.radar_plot(readings_folder, mapping, output_folder=directory_path)
-HMD.gender_distribution(intake_questionnaire, directory_path)
-HMD.age_distribution(intake_questionnaire, directory_path)
-HMD.demographic_distribution(intake_questionnaire, directory_path)
+# HMD.plot_mean_trigger_value_right(data_folder, mapping, output_folder=output_folder)
+# HMD.plot_yaw_movement(data_folder, mapping, output_folder=output_folder)
+# HMD.radar_plot(data_folder, mapping, output_folder=output_folder)
+# HMD.gender_distribution(intake_questionnaire, output_folder)
+# HMD.age_distribution(intake_questionnaire, output_folder)
+# HMD.demographic_distribution(intake_questionnaire, output_folder)
+HMD.read_slider_data(data_folder, output_folder)
