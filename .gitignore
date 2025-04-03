@@ -116,8 +116,8 @@ secret
 sound-unity/Assets/*.csv
 
 # Saved files
-/output
-/data
+_output/
+data
 
 # Dynamic files
 mapping.csv

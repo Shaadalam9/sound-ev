@@ -2,6 +2,7 @@ import pandas as pd
 import os
 import plotly.graph_objects as go
 import plotly.io as pio
+import plotly as py
 import pycountry
 import math
 from collections import defaultdict
@@ -17,13 +18,18 @@ import base64
 import numpy as np
 from scipy.stats import ttest_rel, ttest_ind, f_oneway
 from statsmodels.stats.anova import anova_lm
-from statsmodels.formula.api import ols 
+from statsmodels.formula.api import ols
+import shutil
 
 logger = CustomLogger(__name__)  # use custom logger
 template = common.get_configs("plotly_template")
 
+# Consts
+SAVE_PNG = True
+SAVE_EPS = True
 
-# Todo: Mark the time when the car has started to become visible, started to yield,
+# TODO: update requirements.txt
+# TODO: Mark the time when the car has started to become visible, started to yield,
 # stopped, started to accelerate and taking a turn finally
 class HMD_helper:
     def __init__(self):
@@ -272,7 +278,7 @@ class HMD_helper:
 
         return timewise_averages
 
-    def plot_mean_trigger_value_right(self, data_folder, mapping, output_folder):
+    def plot_mean_trigger_value_right(self, data_folder, mapping, output_folder, save_file=True):
         timewise_avgs = HMD_helper.calculate_average_for_column(data_folder, mapping, 'TriggerValueRight')
         # Create a Plotly figure
         fig = go.Figure()
@@ -289,17 +295,22 @@ class HMD_helper:
 
         # Update layout for better visualization
         fig.update_layout(
-            title="Mean Trigger Value Right Over Time",
             xaxis_title="Timestamp (s)",
-            yaxis_title="Trigger Value Right",
+            yaxis_title="Mean keypress value",
             legend_title="Trials",
             template=template
         )
 
-        # Show the plot
-        fig.show()
+        # save file to local output folder
+        if save_file:
+            # Final adjustments and display
+            fig.update_layout(margin=dict(l=10, r=10, t=10, b=10))
+            HMD_helper.save_plotly_figure(fig, 'mean_trigger_value', save_final=True)
+        # open it in localhost instead
+        else:
+            fig.show()
 
-    def plot_yaw_movement(self, data_folder, mapping, output_folder):
+    def plot_yaw_movement(self, data_folder, mapping, output_folder, save_file=True):
         timewise_avgs = HMD_helper.calculate_average_for_column(data_folder, mapping, 'TriggerValueRight')
         # Create a Plotly figure
         fig = go.Figure()
@@ -316,15 +327,20 @@ class HMD_helper:
 
         # Update layout for better visualization
         fig.update_layout(
-            title="Mean Trigger Value Right Over Time",
             xaxis_title="Timestamp (s)",
-            yaxis_title="Trigger Value Right",
+            yaxis_title="Yaw",
             legend_title="Trials",
             template=template
         )
 
-        # Show the plot
-        fig.show()
+        # save file to local output folder
+        if save_file:
+            # Final adjustments and display
+            fig.update_layout(margin=dict(l=10, r=10, t=10, b=10))
+            HMD_helper.save_plotly_figure(fig, 'yaw_movement', save_final=True)
+        # open it in localhost instead
+        else:
+            fig.show()
 
     @staticmethod
     def gender_distribution(df, output_folder):
@@ -576,3 +592,50 @@ class HMD_helper:
         output_path = os.path.join(output_folder, 'slider_input.csv')
         result_df.to_csv(output_path, index=False)
         logger.info(f"Slider data saved to {output_path}")
+
+    @staticmethod
+    def save_plotly_figure(fig, filename, width=1600, height=900, scale=1, save_final=True):
+        """Saves a Plotly figure as HTML, PNG, SVG, and EPS formats.
+
+        Args:
+            fig (plotly.graph_objs.Figure): Plotly figure object.
+            filename (str): Name of the file (without extension) to save.
+            width (int, optional): Width of the PNG and EPS images in pixels. Defaults to 1600.
+            height (int, optional): Height of the PNG and EPS images in pixels. Defaults to 900.
+            scale (int, optional): Scaling factor for the PNG image. Defaults to 3.
+            save_final (bool, optional): whether to save the "good" final figure.
+        """
+        # Create directory if it doesn't exist
+        output_folder = "_output"
+        output_final = "figures"
+        os.makedirs(output_folder, exist_ok=True)
+        os.makedirs(output_final, exist_ok=True)
+
+        # Save as HTML
+        logger.info(f"Saving html file for {filename}.")
+        py.offline.plot(fig, filename=os.path.join(output_folder, filename + ".html"))
+        # also save the final figure
+        if save_final:
+            py.offline.plot(fig, filename=os.path.join(output_final, filename + ".html"),  auto_open=False)
+
+        try:
+            # Save as PNG
+            if SAVE_PNG:
+                logger.info(f"Saving png file for {filename}.")
+                fig.write_image(os.path.join(output_folder, filename + ".png"), width=width, height=height,
+                                scale=scale)
+                # also save the final figure
+                if save_final:
+                    shutil.copy(os.path.join(output_folder, filename + ".png"),
+                                os.path.join(output_final, filename + ".png"))
+
+            # Save as EPS
+            if SAVE_EPS:
+                logger.info(f"Saving eps file for {filename}.")
+                fig.write_image(os.path.join(output_folder, filename + ".eps"), width=width, height=height)
+                # also save the final figure
+                if save_final:
+                    shutil.copy(os.path.join(output_folder, filename + ".eps"),
+                                os.path.join(output_final, filename + ".eps"))
+        except ValueError:
+            logger.error(f"Value error raised when attempted to save image {filename}.")

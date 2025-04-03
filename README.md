@@ -70,31 +70,31 @@ The project is divided into three main scenes, located in the directory: `sound-
 
 1. **Open the Settings Menu**
    - Access the **Settings** menu.
-   - ![Quick Settings](ReadmeFiles/setting_nav.jpg)
+   - ![Quick Settings](readme/setting_nav.jpg)
 
 2. **Navigate to Physical Space**
    - Select the **Physical Space** option.
-   - ![Physical Space](ReadmeFiles/physical_space.png)
+   - ![Physical Space](readme/physical_space.png)
 
 3. **Clear Boundary and Space Scan History**
    - Choose the option **Clear Boundary and Space Scan History** to reset any previous environment settings.
-   - ![Clear Boundary](ReadmeFiles/clear_boundary.png)
+   - ![Clear Boundary](readme/clear_boundary.png)
 
 4. **Set Floor Level**
    - Click on **Set Floor Level** and adjust it to ensure the floor level is correctly calibrated.
-   - ![Set Floor](ReadmeFiles/floor_level.png)
+   - ![Set Floor](readme/floor_level.png)
 
 5. **Set Boundary with Participant**
    - Return to the **Quick Settings** menu and have the participant wear the headset.
    - Instruct the participant to select **Boundary** from the menu.
-   - ![Boundary](ReadmeFiles/boundary.png)
+   - ![Boundary](readme/boundary.png)
 
 6. **Ensure Correct Orientation**
    - Guide the participant to look down at their shoes to verify correct alignment and orientation.
 
 7. **Confirm Boundary**
    - Ask the participant to press **Confirm Boundary** to finalize the setup.
-   - ![Confirm Boundary](ReadmeFiles/stationary_boundary.png)
+   - ![Confirm Boundary](readme/stationary_boundary.png)
 
 8. **Hand Over Control**
    - Once the boundary is confirmed, the experimenter can take back the controller and headset.
@@ -107,12 +107,12 @@ Before starting the experiment, configure the participant's unique ID:
 1. **Open the Environment Scene**
    - Navigate to **Assets > Scenes**.
    - Select the **Environment** scene.
-   - ![Environment](ReadmeFiles/environment_menu.png)
+   - ![Environment](readme/environment_menu.png)
 
 2. **Modify the ConditionController**
    - Locate the `ConditionController` in the **Hierarchy** tab.
    - Fill in the `Write File Name` field with the participant's unique name or ID.
-   - ![Setup Instructions](ReadmeFiles/fig_1.png)
+   - ![Setup Instructions](readme/fig_1.png)
 
 
 ### **Connecting to Quest Link and Launching Unity**:
@@ -120,24 +120,24 @@ Set up the Unity environment and connect it to the Quest using the following ste
 
 1. **Launch Unity**
    - Ensure that Unity is open on your computer and the **MainMenu** environment is loaded.
-   - ![MainMenu](ReadmeFiles/main_menu.png)
+   - ![MainMenu](readme/main_menu.png)
 
 2. **Open Quest Link**
    - Navigate to the **Settings** menu and select Quest Link via Meta Quest.
-   - ![Quest Link](ReadmeFiles/Quest_link.png)
+   - ![Quest Link](readme/Quest_link.png)
 
 3. **Add Desktop Panel**
    - In Quest Link, click on **Add Desktop Panel**.
-   - ![Add Desktop Panel](ReadmeFiles/add_desktop_panel.png)
+   - ![Add Desktop Panel](readme/add_desktop_panel.png)
 
 4. **Select Unity**
    - Choose Unity from the available options in the desktop panel.
-   - ![Select Unity](ReadmeFiles/select_unity.png)
+   - ![Select Unity](readme/select_unity.png)
 
 5. **Verify Main Menu Scene**
    - Ensure the Main Menu scene is visible in the Quest.
    - Press the **Play** button in Unity to start the experiment.
-   - ![Play Button](ReadmeFiles/play_button.png)
+   - ![Play Button](readme/play_button.png)
 
 6. **Participant Instructions**
    - Have the participant wear the headset.
@@ -145,9 +145,9 @@ Set up the Unity environment and connect it to the Quest using the following ste
 
 7. **Resolving Overlapping Menus**
    - If another menu appears in front of the instructions:
-     - ![Error](ReadmeFiles/error.png)
+     - ![Error](readme/error.png)
      - Press the Meta button on the right controller to resolve the issue.
-     - ![Debug](ReadmeFiles/debug.png)
+     - ![Debug](readme/debug.png)
 
 
 ---
@@ -158,7 +158,7 @@ Set up the Unity environment and connect it to the Quest using the following ste
 
 Participants record their willingness to cross the road using the **trigger button** on the controller. The interaction process is illustrated in the image below:  
 
-![Trigger Button](ReadmeFiles/trigger.jpeg)
+![Trigger Button](readme/trigger.jpeg)
 
 - **How to Record**:  
   Press the trigger button when you feel safe to cross the road.
@@ -183,6 +183,9 @@ The experiment captures and saves data for analysis in the `data` folder. The fo
    - **Response Data**:  
      A separate CSV file is generated to store responses to the questions asked between trials.
 
+## Collected data
+[![Keypress](figures/mean_trigger_value.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/mean_trigger_value.html)
+Mean keypress value.
 
 ## Contact
-If you have any questions or suggestions, feel free to reach out to md_shadab_alam@outlook.com
+If you have any questions or suggestions, feel free to reach out to md_shadab_alam@outlook.com or pavlo.bazilinskyy@gmail.com.

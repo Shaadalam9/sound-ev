@@ -1,5 +1,4 @@
 # by Shadab Alam <shaadalam.5u@gmail.com> and Pavlo Bazilinskyy <pavlo.bazilinskyy@gmail.com>
-
 from helper import HMD_helper
 from custom_logger import CustomLogger
 from logmod import logs
@@ -28,24 +27,14 @@ try:
 except Exception as e:
     print(f"Error occurred while creating directory: {e}")
 
-
-group_titles = [
-    "Yielding, Front and no eHMI",
-    "Yielding, Back and no eHMI",
-    "Yieding, Front and eHMI",
-    "Yielding, Back and eHMI",
-    "No Yielding, Front and eHMI",
-    "No Yielding, Back and eHMI",
-    "No Yielding, Front and no eHMI",
-    "No Yielding, Back and no eHMI"
-]
-
-legend_labels = ["1m", "2m", "3m", "4m", "5m"]
-
-HMD.plot_mean_trigger_value_right(data_folder, mapping, output_folder=output_folder)
-HMD.plot_yaw_movement(data_folder, mapping, output_folder=output_folder)
-HMD.radar_plot(data_folder, mapping, output_folder=output_folder)
-HMD.gender_distribution(intake_questionnaire, output_folder)
-HMD.age_distribution(intake_questionnaire, output_folder)
-HMD.demographic_distribution(intake_questionnaire, output_folder)
-HMD.read_slider_data(data_folder, output_folder)
+# Execute analysis
+if __name__ == "__main__":
+    logger.info("Analysis started.")
+    HMD.plot_mean_trigger_value_right(data_folder, mapping, output_folder=output_folder)
+    # TODO: same figure as one before
+    HMD.plot_yaw_movement(data_folder, mapping, output_folder=output_folder)
+    # HMD.radar_plot(data_folder, mapping, output_folder=output_folder)
+    # HMD.gender_distribution(intake_questionnaire, output_folder)
+    # HMD.age_distribution(intake_questionnaire, output_folder)
+    # HMD.demographic_distribution(intake_questionnaire, output_folder)
+    HMD.read_slider_data(data_folder, output_folder)
