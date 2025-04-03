@@ -557,7 +557,6 @@ class HMD_helper:
             for file in os.listdir(folder_path):
                 file_path = os.path.join(folder_path, file)
                 if re.match(rf'Participant_{participant_id}_\d+_\d+\.csv', file):
-                    print(file_path, participant_id)
                     df = pd.read_csv(file_path, header=None, names=["trial", "slider1", "slider2", "slider3"])
                     df.set_index("trial", inplace=True)
                     participant_data[participant_id] = df
