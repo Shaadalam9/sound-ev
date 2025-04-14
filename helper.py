@@ -292,7 +292,7 @@ class HMD_helper:
         # Iterate through all trials and add traces
         for trial_name, df in timewise_avgs.items():
             # Ensure 'sound_clip_name' exists in the dataframe
-            legend_name = self.get_sound_clip_name(mapping, trial_name) if "sound_clip_name" in mapping.columns else trial_name
+            legend_name = self.get_sound_clip_name(mapping, trial_name) if "sound_clip_name" in mapping.columns else trial_name  # noqa: E501
 
             # TODO: add check for config param for smoothing
             smoothed_values = self.smoothen_filter(df["TriggerValueRight"].tolist())
@@ -352,8 +352,7 @@ class HMD_helper:
         else:
             fig.show()
 
-    @staticmethod
-    def gender_distribution(df, output_folder, save_file=True):
+    def gender_distribution(self, df, output_folder, save_file=True):
         # Check if df is a string (file path), and read it as a DataFrame if necessary
         if isinstance(df, str):
             df = pd.read_csv(df)
@@ -388,8 +387,7 @@ class HMD_helper:
         else:
             fig.show()
     
-    @staticmethod
-    def age_distribution(df, output_folder, save_file=True):
+    def age_distribution(self, df, output_folder, save_file=True):
         # Check if df is a string (file path), and read it as a DataFrame if necessary
         if isinstance(df, str):
             df = pd.read_csv(df)
@@ -596,9 +594,9 @@ class HMD_helper:
                 else:
                     row[trial] = [None, None, None]
             
-            slider_data["noticeability"].append([participant_id] + [vals[0] for vals in row.values() if isinstance(vals, list)])
+            slider_data["noticeability"].append([participant_id] + [vals[0] for vals in row.values() if isinstance(vals, list)])  # noqa: E501
             slider_data["info"].append([participant_id] + [vals[1] for vals in row.values() if isinstance(vals, list)])
-            slider_data["annoyance"].append([participant_id] + [vals[2] for vals in row.values() if isinstance(vals, list)])
+            slider_data["annoyance"].append([participant_id] + [vals[2] for vals in row.values() if isinstance(vals, list)])  # noqa: E501
         
         # convert lists to dataframes and rename columns based on mapping file
         for slider, data in slider_data.items():
