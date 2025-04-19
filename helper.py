@@ -3,6 +3,7 @@ import os
 import plotly.graph_objects as go
 import plotly.io as pio
 import plotly as py
+from plotly import subplots
 import pycountry
 import math
 from collections import defaultdict
@@ -19,7 +20,7 @@ import numpy as np
 from scipy.stats import ttest_rel, ttest_ind, f_oneway
 from statsmodels.stats.anova import anova_lm
 from statsmodels.formula.api import ols
-import shutil
+import settings_dir as settings_dir
 
 logger = CustomLogger(__name__)  # use custom logger
 template = common.get_configs("plotly_template")
@@ -33,6 +34,14 @@ SAVE_EPS = True
 # TODO: Mark the time when the car has started to become visible, started to yield,
 # stopped, started to accelerate and taking a turn finally
 class HMD_helper:
+
+    # set template for plotly output
+    template = common.get_configs('plotly_template')
+    smoothen_signal = common.get_configs('smoothen_signal')
+    folder_figures = 'figures'  # subdirectory to save figures
+    folder_stats = 'statistics'  # subdirectory to save statistical output
+    res = common.get_configs('kp_resolution')
+
     def __init__(self):
         pass
 
@@ -315,7 +324,7 @@ class HMD_helper:
         if save_file:
             # Final adjustments and display
             fig.update_layout(margin=dict(l=10, r=10, t=10, b=10))
-            self.save_plotly_figure(fig, 'kp', save_final=True)
+            self.save_plotly(fig, 'kp', save_final=True)
         # open it in localhost instead
         else:
             fig.show()
@@ -347,7 +356,7 @@ class HMD_helper:
         if save_file:
             # Final adjustments and display
             fig.update_layout(margin=dict(l=10, r=10, t=10, b=10))
-            self.save_plotly_figure(fig, 'yaw_movement', save_final=True)
+            self.save_plotly(fig, 'yaw_movement', save_final=True)
         # open it in localhost instead
         else:
             fig.show()
@@ -357,7 +366,7 @@ class HMD_helper:
         if isinstance(df, str):
             df = pd.read_csv(df)
         # Count the occurrences of each gender
-        gender_counts = df.groupby('What is your gender?').size().reset_index(name='count')
+        gender_counts = df.groupby('What is your gender?').size().reset_index(name='count')  # type: ignore
 
         # Drop any NaN values that may arise from invalid gender entries
         gender_counts = gender_counts.dropna(subset=['What is your gender?'])
@@ -382,18 +391,18 @@ class HMD_helper:
         if save_file:
             # Final adjustments and display
             fig.update_layout(margin=dict(l=10, r=10, t=10, b=10))
-            self.save_plotly_figure(fig, 'gender', save_final=True)
+            self.save_plotly(fig, 'gender', save_final=True)
         # open it in localhost instead
         else:
             fig.show()
-    
+
     def age_distribution(self, df, output_folder, save_file=True):
         # Check if df is a string (file path), and read it as a DataFrame if necessary
         if isinstance(df, str):
             df = pd.read_csv(df)
 
         # Count the occurrences of each age
-        age_counts = df.groupby('What is your age (in years)?').size().reset_index(name='count')
+        age_counts = df.groupby('What is your age (in years)?').size().reset_index(name='count')  # type: ignore
 
         # Convert the 'What is your age (in years)?' column to numeric (ignoring errors for non-numeric values)
         age_counts['What is your age (in years)?'] = pd.to_numeric(age_counts['What is your age (in years)?'],
@@ -426,7 +435,7 @@ class HMD_helper:
         if save_file:
             # Final adjustments and display
             fig.update_layout(margin=dict(l=10, r=10, t=10, b=10))
-            self.save_plotly_figure(fig, 'age', save_final=True)
+            self.save_plotly(fig, 'age', save_final=True)
         # open it in localhost instead
         else:
             fig.show()
@@ -453,8 +462,11 @@ class HMD_helper:
             "Maltese": "Malta",
             "Indonesian": "Indonesia",
             "Portuguese": "Portugal",
-            "Romanian": "Romania"
-
+            "Romanian": "Romania",
+            "American": "United States",
+            "Ghanaian": "Ghana",
+            "Peruvian": "Peru",
+            "greek": "Greece"
         }
 
         # Replace all variations of nationality with the consistent values using a dictionary
@@ -553,22 +565,22 @@ class HMD_helper:
     def read_slider_data(data_folder, mapping, output_folder):
         participant_data = {}
         all_trials = set()
-        
+
         # load mapping file
         mapping_dict = dict(zip(mapping["video_id"], mapping["sound_clip_name"]))
-        
+
         # iterate over participant folders
         for folder in sorted(os.listdir(data_folder)):
             folder_path = os.path.join(data_folder, folder)
             if not os.path.isdir(folder_path):
                 continue
-            
+
             # extract participant id
             match = re.match(r'Participant_(\d+)_', folder)
             if not match:
                 continue
             participant_id = int(match.group(1))
-            
+
             # find the main csv file containing slider data
             for file in os.listdir(folder_path):
                 file_path = os.path.join(folder_path, file)
@@ -578,14 +590,14 @@ class HMD_helper:
                     participant_data[participant_id] = df
                     all_trials.update(df.index)
                     break
-        
+
         # create a sorted list of all trials
         all_trials = sorted([t for t in all_trials if t != "test"], key=lambda x: int(re.search(r'\d+', x).group()))
         all_trials.insert(0, "test") if "test" in all_trials else None
-        
+
         # construct separate dataframes for each slider
         slider_data = {"noticeability": [], "info": [], "annoyance": []}
-        
+
         for participant_id, df in sorted(participant_data.items()):
             row = {"participant_id": participant_id}
             for trial in all_trials:
@@ -593,68 +605,584 @@ class HMD_helper:
                     row[trial] = df.loc[trial].to_list()
                 else:
                     row[trial] = [None, None, None]
-            
+
             slider_data["noticeability"].append([participant_id] + [vals[0] for vals in row.values() if isinstance(vals, list)])  # noqa: E501
             slider_data["info"].append([participant_id] + [vals[1] for vals in row.values() if isinstance(vals, list)])
             slider_data["annoyance"].append([participant_id] + [vals[2] for vals in row.values() if isinstance(vals, list)])  # noqa: E501
-        
+
         # convert lists to dataframes and rename columns based on mapping file
         for slider, data in slider_data.items():
             df = pd.DataFrame(data, columns=["participant_id"] + all_trials)
             df.rename(columns={trial: mapping_dict.get(trial, trial) for trial in all_trials}, inplace=True)
-            
+
             # add average row
             avg_values = df.iloc[:, 1:].mean(skipna=True)
             avg_row = pd.DataFrame([["average"] + avg_values.tolist()], columns=df.columns)
             df = pd.concat([df, avg_row], ignore_index=True)
-            
+
             # save each slider dataframe separately
             output_path = os.path.join(output_folder, f"slider_input_{slider}.csv")
             df.to_csv(output_path, index=False)
             logger.info(f"{slider} data saved to {output_path}")
 
-    def save_plotly_figure(self, fig, filename, width=1600, height=900, scale=1, save_final=True):
-        """Saves a Plotly figure as HTML, PNG, SVG, and EPS formats.
+    def save_plotly(self, fig, name, remove_margins=False, width=1320, height=680, save_eps=True, save_png=True,
+                    save_html=True, open_browser=True, save_mp4=False, save_final=False):
+        """
+        Helper function to save figure as html file.
 
         Args:
-            fig (plotly.graph_objs.Figure): Plotly figure object.
-            filename (str): Name of the file (without extension) to save.
-            width (int, optional): Width of the PNG and EPS images in pixels. Defaults to 1600.
-            height (int, optional): Height of the PNG and EPS images in pixels. Defaults to 900.
-            scale (int, optional): Scaling factor for the PNG image. Defaults to 3.
+            fig (plotly figure): figure object.
+            name (str): name of html file.
+            path (str): folder for saving file.
+            remove_margins (bool, optional): remove white margins around EPS figure.
+            width (int, optional): width of figures to be saved.
+            height (int, optional): height of figures to be saved.
+            save_eps (bool, optional): save image as EPS file.
+            save_png (bool, optional): save image as PNG file.
+            save_html (bool, optional): save image as html file.
+            open_browser (bool, optional): open figure in the browse.
+            save_mp4 (bool, optional): save video as MP4 file.
             save_final (bool, optional): whether to save the "good" final figure.
         """
-        # Create directory if it doesn't exist
-        output_folder = "_output"
-        output_final = "figures"
-        os.makedirs(output_folder, exist_ok=True)
-        os.makedirs(output_final, exist_ok=True)
-
-        # Save as HTML
-        logger.info(f"Saving html file for {filename}.")
-        py.offline.plot(fig, filename=os.path.join(output_folder, filename + ".html"))
-        # also save the final figure
-        if save_final:
-            py.offline.plot(fig, filename=os.path.join(output_final, filename + ".html"),  auto_open=False)
-
-        try:
-            # Save as PNG
-            if SAVE_PNG:
-                logger.info(f"Saving png file for {filename}.")
-                fig.write_image(os.path.join(output_folder, filename + ".png"), width=width, height=height,
-                                scale=scale)
+        # build path
+        path = os.path.join(settings_dir.output_dir, self.folder_figures)
+        if not os.path.exists(path):
+            os.makedirs(path)
+        # build path for final figure
+        path_final = os.path.join(settings_dir.root_dir, self.folder_figures)
+        if save_final and not os.path.exists(path_final):
+            os.makedirs(path_final)
+        # limit name to max 200 char (for Windows)
+        if len(path) + len(name) > 195 or len(path_final) + len(name) > 195:
+            name = name[:200 - len(path) - 5]
+        # save as html
+        if save_html:
+            if open_browser:
+                # open in browser
+                py.offline.plot(fig, filename=os.path.join(path, name + '.html'))
                 # also save the final figure
                 if save_final:
-                    shutil.copy(os.path.join(output_folder, filename + ".png"),
-                                os.path.join(output_final, filename + ".png"))
-
-            # Save as EPS
-            if SAVE_EPS:
-                logger.info(f"Saving eps file for {filename}.")
-                fig.write_image(os.path.join(output_folder, filename + ".eps"), width=width, height=height)
+                    py.offline.plot(fig, filename=os.path.join(path_final, name + '.html'), auto_open=False)
+            else:
+                # do not open in browser
+                py.offline.plot(fig, filename=os.path.join(path, name + '.html'), auto_open=False)
                 # also save the final figure
                 if save_final:
-                    shutil.copy(os.path.join(output_folder, filename + ".eps"),
-                                os.path.join(output_final, filename + ".eps"))
-        except ValueError:
-            logger.error(f"Value error raised when attempted to save image {filename}.")
+                    py.offline.plot(fig, filename=os.path.join(path_final, name + '.html'), auto_open=False)
+        # remove white margins
+        if remove_margins:
+            fig.update_layout(margin=dict(l=2, r=2, t=20, b=12))
+        # save as eps
+        if save_eps:
+            fig.write_image(os.path.join(path, name + '.eps'), width=width, height=height)
+            # also save the final figure
+            if save_final:
+                fig.write_image(os.path.join(path_final, name + '.eps'), width=width, height=height)
+        # save as png
+        if save_png:
+            fig.write_image(os.path.join(path, name + '.png'), width=width, height=height)
+            # also save the final figure
+            if save_final:
+                fig.write_image(os.path.join(path_final, name + '.png'), width=width, height=height)
+        # save as mp4
+        if save_mp4:
+            fig.write_image(os.path.join(path, name + '.mp4'), width=width, height=height)
+
+    def plot_kp_slider_videos(self, df, y: list, y_legend_kp=None, x=None, events=None, events_width=1,
+                              events_dash='dot', events_colour='black', events_annotations_font_size=20,
+                              events_annotations_colour='black', xaxis_kp_title='Time (s)',
+                              yaxis_kp_title='Percentage of trials with response key pressed',
+                              xaxis_kp_range=None, yaxis_kp_range=None, stacked=False, pretty_text=False,
+                              orientation='v', xaxis_slider_title='Stimulus', yaxis_slider_show=False,
+                              yaxis_slider_title=None, show_text_labels=False, xaxis_ticklabels_slider_show=True,
+                              yaxis_ticklabels_slider_show=False, name_file='kp_videos_sliders', save_file=False,
+                              save_final=False, fig_save_width=1320, fig_save_height=680, legend_x=0.7, legend_y=0.95,
+                              font_family=None, font_size=None, ttest_signals=None, ttest_marker='circle',
+                              ttest_marker_size=3, ttest_marker_colour='black', ttest_annotations_font_size=10,
+                              ttest_annotations_colour='black', anova_signals=None, anova_marker='cross',
+                              anova_marker_size=3, anova_marker_colour='black', anova_annotations_font_size=10,
+                              anova_annotations_colour='black', ttest_anova_row_height=0.5, xaxis_step=5,
+                              yaxis_step=5, y_legend_bar=None, line_width=1, bar_font_size=None):
+        """Plot keypresses with multiple variables as a filter and slider questions for the stimuli.
+
+        Args:
+            df (dataframe): dataframe with stimuli data.
+            y (list): column names of dataframe to plot.
+            y_legend_kp (list, optional): names for variables for keypress data to be shown in the legend.
+            x (list): values in index of dataframe to plot for. If no value is given, the index of df is used.
+            events (list, optional): list of events to draw formatted as values on x axis.
+            events_width (int, optional): thickness of the vertical lines.
+            events_dash (str, optional): type of the vertical lines.
+            events_colour (str, optional): colour of the vertical lines.
+            events_annotations_font_size (int, optional): font size of annotations for the vertical lines.
+            events_annotations_colour (str, optional): colour of annotations for the vertical lines.
+            xaxis_kp_title (str, optional): title for x axis. for the keypress plot
+            yaxis_kp_title (str, optional): title for y axis. for the keypress plot
+            xaxis_kp_range (None, optional): range of x axis in format [min, max] for the keypress plot.
+            yaxis_kp_range (None, optional): range of x axis in format [min, max] for the keypress plot.
+            stacked (bool, optional): show as stacked chart.
+            pretty_text (bool, optional): prettify ticks by replacing _ with spaces and capitalising each value.
+            orientation (str, optional): orientation of bars. v=vertical, h=horizontal.
+            xaxis_slider_title (None, optional): title for x axis. for the slider data plot.
+            yaxis_slider_show (bool, optional): show y axis or not.
+            yaxis_slider_title (None, optional): title for y axis. for the slider data plot.
+            show_text_labels (bool, optional): output automatically positioned text labels.
+            xaxis_ticklabels_slider_show (bool, optional): show tick labels for slider plot.
+            yaxis_ticklabels_slider_show (bool, optional): show tick labels for slider plot.
+            name_file (str, optional): name of file to save.
+            save_file (bool, optional): flag for saving an html file with plot.
+            save_final (bool, optional): flag for saving an a final figure to /figures.
+            fig_save_width (int, optional): width of figures to be saved.
+            fig_save_height (int, optional): height of figures to be saved.
+            legend_x (float, optional): location of legend, percentage of x axis.
+            legend_y (float, optional): location of legend, percentage of y axis.
+            font_family (str, optional): font family to be used across the figure. None = use config value.
+            font_size (int, optional): font size to be used across the figure. None = use config value.
+            ttest_signals (list, optional): signals to compare with ttest. None = do not compare.
+            ttest_marker (str, optional): symbol of markers for the ttest.
+            ttest_marker_size (int, optional): size of markers for the ttest.
+            ttest_marker_colour (str, optional): colour of markers for the ttest.
+            ttest_annotations_font_size (int, optional): font size of annotations for ttest.
+            ttest_annotations_colour (str, optional): colour of annotations for ttest.
+            anova_signals (dict, optional): signals to compare with ANOVA. None = do not compare.
+            anova_marker (str, optional): symbol of markers for the ANOVA.
+            anova_marker_size (int, optional): size of markers for the ANOVA.
+            anova_marker_colour (str, optional): colour of markers for the ANOVA.
+            anova_annotations_font_size (int, optional): font size of annotations for ANOVA.
+            anova_annotations_colour (str, optional): colour of annotations for ANOVA.
+            ttest_anova_row_height (int, optional): height of row of ttest/anova markers.
+            xaxis_step (int): step between ticks on x axis.
+            yaxis_step (int): step between ticks on y axis.
+            y_legend_bar (list, optional): names for variables for bar data to be shown in the legend.
+            line_width (int): width of the keypress line.
+        """
+        logger.info('Creating figure keypress and slider data for {}.', df.index.tolist())
+        # calculate times
+        times = np.array(range(self.res, df['video_length'].max() + self.res, self.res)) / 1000
+        # plotly
+        fig = subplots.make_subplots(rows=2,
+                                     cols=2,
+                                     column_widths=[0.85, 0.15],
+                                     # subplot_titles=('Mean keypress values', 'Responses to sliders'),
+                                     specs=[[{"rowspan": 2}, {}],
+                                            [None, {}]],
+                                     horizontal_spacing=0.05,
+                                     # vertical_spacing=0.1,
+                                     shared_xaxes=False,
+                                     shared_yaxes=False)
+        # adjust ylim, if ttest results need to be plotted
+        if ttest_signals:
+            # assume one row takes ttest_anova_row_height on y axis
+            yaxis_kp_range[0] = round(yaxis_kp_range[0] - len(ttest_signals) * ttest_anova_row_height - ttest_anova_row_height)  # noqa: E501  # type: ignore
+        # adjust ylim, if anova results need to be plotted
+        if anova_signals:
+            # assume one row takes ttest_anova_row_height on y axis
+            yaxis_kp_range[0] = round(yaxis_kp_range[0] - len(anova_signals) * ttest_anova_row_height - ttest_anova_row_height)  # noqa: E501  # type: ignore
+        # plot keypress data
+        for index, row in df.iterrows():
+            values = row['kp']  # keypress data
+            row_number = df.index.get_loc(index)  # get the row number
+            # custom labels for legend
+            if y_legend_kp:
+                name = y_legend_kp[row_number]
+            else:
+                name = os.path.splitext(index)[0]
+            # smoothen signal
+            if self.smoothen_signal:
+                values = self.smoothen_filter(values)
+            # plot signal
+            fig.add_trace(go.Scatter(y=values,
+                                     mode='lines',
+                                     x=times,
+                                     line=dict(width=line_width),
+                                     name=name),
+                          row=1,
+                          col=1)
+        # draw events
+        self.draw_events(fig=fig,
+                         yaxis_range=yaxis_kp_range,
+                         events=events,
+                         events_width=events_width,
+                         events_dash=events_dash,
+                         events_colour=events_colour,
+                         events_annotations_font_size=events_annotations_font_size,
+                         events_annotations_colour=events_annotations_colour)
+        # update axis
+        # update axis
+        if xaxis_step:
+            fig.update_xaxes(title_text=xaxis_kp_title, range=xaxis_kp_range, dtick=xaxis_step, row=1, col=1)
+        else:
+            fig.update_xaxes(title_text=xaxis_kp_title, range=xaxis_kp_range, row=1, col=1)
+        fig.update_yaxes(title_text=yaxis_kp_title, showgrid=False, range=yaxis_kp_range, row=1, col=1)
+        # prettify text
+        if pretty_text:
+            for variable in y:
+                # check if column contains strings
+                if isinstance(df.iloc[0][variable], str):
+                    # replace underscores with spaces
+                    df[variable] = df[variable].str.replace('_', ' ')
+                    # capitalise
+                    df[variable] = df[variable].str.capitalize()
+        # Plot slider data
+        # use index of df if none is given
+        if not x:
+            x = df.index
+        # plot 1st variable on top
+        # showing text labels
+        if show_text_labels:
+            text = df[y[0]]
+        else:
+            text = None
+        # custom labels for legend
+        if y_legend_bar:
+            name = y_legend_bar[0]
+        else:
+            name = y[0]
+        # # plot variable
+        # if bar_font_size:
+        #     font_size = bar_font_size
+        # else:
+        #     font_size = font_size
+        fig.add_trace(go.Bar(x=x,
+                             y=df[y[0]],
+                             name=name,
+                             orientation=orientation,
+                             text=text,
+                             textfont=dict(size=bar_font_size),
+                             textposition='auto',
+                             marker=dict(
+                                color='purple'  # bar color
+                             )),
+                      row=1,
+                      col=2)
+        # plot 2nd variable at bottom
+        if show_text_labels:
+            text = df[y[1]]
+        else:
+            text = None
+        # custom labels for legend
+        if y_legend_bar:
+            name = y_legend_bar[1]
+        else:
+            name = y[1]
+        # plot variable
+        fig.add_trace(go.Bar(x=x,
+                             y=df[y[1]],
+                             name=name,
+                             orientation=orientation,
+                             text=text,
+                             textfont=dict(size=bar_font_size),
+                             textposition='auto',
+                             marker=dict(
+                                color='orange'  # bar color
+                             )),
+                      row=2,
+                      col=2)
+        # draw ttest and anova rows
+        self.draw_ttest_anova(fig=fig,
+                              times=times,
+                              name_file=name_file,
+                              yaxis_range=yaxis_kp_range,
+                              yaxis_step=yaxis_step,
+                              ttest_signals=ttest_signals,
+                              ttest_marker=ttest_marker,
+                              ttest_marker_size=ttest_marker_size,
+                              ttest_marker_colour=ttest_marker_colour,
+                              ttest_annotations_font_size=ttest_annotations_font_size,
+                              ttest_annotations_colour=ttest_annotations_colour,
+                              anova_signals=anova_signals,
+                              anova_marker=anova_marker,
+                              anova_marker_size=anova_marker_size,
+                              anova_marker_colour=anova_marker_colour,
+                              anova_annotations_font_size=anova_annotations_font_size,
+                              anova_annotations_colour=anova_annotations_colour,
+                              ttest_anova_row_height=ttest_anova_row_height)
+        # update axis
+        fig.update_xaxes(title_text=None, row=1, col=2)
+        fig.update_xaxes(title_text=None, row=2, col=2)
+        fig.update_yaxes(title_text=yaxis_slider_title, row=2, col=2)
+        fig.update_yaxes(visible=yaxis_slider_show, row=1, col=2)
+        fig.update_yaxes(visible=yaxis_slider_show, row=2, col=2)
+        fig.update_xaxes(showticklabels=False, row=1, col=2)
+        fig.update_yaxes(showticklabels=yaxis_ticklabels_slider_show, row=2, col=2)
+        fig.update_xaxes(showticklabels=xaxis_ticklabels_slider_show, row=1, col=2)
+        fig.update_yaxes(showticklabels=yaxis_ticklabels_slider_show, row=2, col=2)
+        # update template
+        fig.update_layout(template=self.template)
+        # manually add grid lines for non-negative y values only
+        for y in range(0, yaxis_kp_range[1] + 1, yaxis_step):  # type: ignore
+            fig.add_shape(type="line",
+                          x0=fig.layout.xaxis.range[0] if fig.layout.xaxis.range else 0,
+                          x1=fig.layout.xaxis.range[1] if fig.layout.xaxis.range else 1,
+                          y0=y,
+                          y1=y,
+                          line=dict(color='#333333' if common.get_configs('plotly_template') == 'plotly_dark' else '#e5ecf6',  # noqa: E501
+                                    width=1),
+                          xref='x',
+                          yref='y',
+                          layer='below')
+        # format text labels
+        if show_text_labels:
+            fig.update_traces(texttemplate='%{text:.2f}')
+        # stacked bar chart
+        if stacked:
+            fig.update_layout(barmode='stack')
+        # legend
+        fig.update_layout(legend=dict(x=legend_x, y=legend_y, bgcolor='rgba(0,0,0,0)'))
+        # update font family
+        if font_family:
+            # use given value
+            fig.update_layout(font=dict(family=font_family))
+        else:
+            # use value from config file
+            fig.update_layout(font=dict(family=common.get_configs('font_family')))
+        # update font size
+        if font_size:
+            # use given value
+            fig.update_layout(font=dict(size=font_size))
+        else:
+            # use value from config file
+            fig.update_layout(font=dict(size=common.get_configs('font_size')))
+        # save file to local output folder
+        if save_file:
+            self.save_plotly(fig=fig,
+                             name=name_file,
+                             remove_margins=True,
+                             width=fig_save_width,
+                             height=fig_save_height,
+                             save_final=save_final)  # also save as "final" figure
+        # open it in localhost instead
+        else:
+            fig.show()
+
+    def draw_ttest_anova(self, fig, times, name_file, yaxis_range, yaxis_step, ttest_signals, ttest_marker,
+                         ttest_marker_size, ttest_marker_colour, ttest_annotations_font_size, ttest_annotations_colour,
+                         anova_signals, anova_marker, anova_marker_size, anova_marker_colour,
+                         anova_annotations_font_size, anova_annotations_colour, ttest_anova_row_height):
+        """Draw ttest and anova test rows.
+
+        Args:
+            fig (figure): figure object.
+            name_file (str): name of file to save.
+            yaxis_range (list): range of x axis in format [min, max] for the keypress plot.
+            yaxis_step (int): step between ticks on y axis.
+            ttest_signals (list): signals to compare with ttest. None = do not compare.
+            ttest_marker (str): symbol of markers for the ttest.
+            ttest_marker_size (int): size of markers for the ttest.
+            ttest_marker_colour (str): colour of markers for the ttest.
+            ttest_annotations_font_size (int): font size of annotations for ttest.
+            ttest_annotations_colour (str): colour of annotations for ttest.
+            anova_signals (dict): signals to compare with ANOVA. None = do not compare.
+            anova_marker (str): symbol of markers for the ANOVA.
+            anova_marker_size (int): size of markers for the ANOVA.
+            anova_marker_colour (str): colour of markers for the ANOVA.
+            anova_annotations_font_size (int): font size of annotations for ANOVA.
+            anova_annotations_colour (str): colour of annotations for ANOVA.
+            ttest_anova_row_height (int): height of row of ttest/anova markers.
+        """
+        # count lines to calculate increase in coordinates of drawing
+        counter_ttest = 0
+        # count lines to calculate increase in coordinates of drawing
+        counter_anova = 0
+        # output ttest
+        if ttest_signals:
+            for signals in ttest_signals:
+                # receive significance values
+                [p_values, significance] = self.ttest(signal_1=signals['signal_1'],
+                                                      signal_2=signals['signal_2'],
+                                                      paired=signals['paired'])  # type: ignore
+                # save results to csv
+                self.save_stats_csv(t=list(range(len(signals['signal_1']))),
+                                    p_values=p_values,
+                                    name_file=signals['label'] + '_' + name_file + '.csv')
+                # only proceed if there are significant results
+                if any(significance):  # Check if any significance is true (i.e., any stars)
+                    # add to the plot
+                    # plot stars based on random lists
+                    marker_x = []  # x-coordinates for stars
+                    marker_y = []  # y-coordinates for stars
+                    # assuming `times` and `signals['signal_1']` correspond to x and y data points
+                    for i in range(len(significance)):
+                        if significance[i] == 1:  # if value indicates a star
+                            marker_x.append(times[i])  # use the corresponding x-coordinate
+                            # dynamically set y-coordinate, offset by ttest_anova_row_height for each signal_index
+                            marker_y.append(-ttest_anova_row_height - counter_ttest * ttest_anova_row_height)
+                    # add scatter plot trace with cleaned data
+                    fig.add_trace(go.Scatter(x=marker_x,
+                                             y=marker_y,
+                                             # list of possible values: https://plotly.com/python/marker-style
+                                             mode='markers',
+                                             marker=dict(symbol=ttest_marker,  # marker
+                                                         size=ttest_marker_size,  # adjust size
+                                                         color=ttest_marker_colour),  # adjust colour
+                                             text=p_values,
+                                             showlegend=False,
+                                             hovertemplate=signals['label'] + ': time=%{x}, p_value=%{text}'),
+                                  row=1,
+                                  col=1)
+                    # add label with signals that are compared
+                    fig.add_annotation(text=signals['label'],
+                                       # put labels at the start of the x axis, as they are likely no significant
+                                       # effects in the start of the trial
+                                       x=0.2,
+                                       # draw in the negative range of y axis
+                                       y=-ttest_anova_row_height - counter_ttest * ttest_anova_row_height,
+                                       xanchor="left",  # aligns the left edge
+                                       showarrow=False,
+                                       font=dict(size=ttest_annotations_font_size, color=ttest_annotations_colour))
+                    # increase counter of lines drawn
+                    counter_ttest = counter_ttest + 1
+        # output ANOVA
+        if anova_signals:
+            # if ttest was plotted, take into account for y of the first row or marker
+            if counter_ttest > 0:
+                counter_anova = counter_ttest
+            # calculate for given signals one by one
+            for signals in anova_signals:
+                # receive significance values
+                [p_values, significance] = self.anova(signals)
+                # save results to csv
+                self.save_stats_csv(t=list(range(len(signals['signals'][0]))),
+                                    p_values=p_values,
+                                    name_file=signals['label'] + '_' + name_file + '.csv')
+                # only proceed if there are significant results
+                if any(significance):  # Check if any significance is true (i.e., any stars)
+                    # add to the plot
+                    marker_x = []  # x-coordinates for stars
+                    marker_y = []  # y-coordinates for stars
+                    # assuming `times` and `signals['signal_1']` correspond to x and y data points
+                    for i in range(len(significance)):
+                        if significance[i] == 1:  # if value indicates a star
+                            marker_x.append(times[i])  # use the corresponding x-coordinate
+                            # dynamically set y-coordinate, slightly offset for each signal_index
+                            marker_y.append(-ttest_anova_row_height - counter_anova * ttest_anova_row_height)
+                    # add scatter plot trace with cleaned data
+                    fig.add_trace(go.Scatter(x=marker_x,
+                                             y=marker_y,
+                                             # list of possible values: https://plotly.com/python/marker-style
+                                             mode='markers',
+                                             marker=dict(symbol=anova_marker,  # marker
+                                                         size=anova_marker_size,  # adjust size
+                                                         color=anova_marker_colour),  # adjust colour
+                                             text=p_values,
+                                             showlegend=False,
+                                             hovertemplate='time=%{x}, p_value=%{text}'),
+                                  row=1,
+                                  col=1)
+                    # add label with signals that are compared
+                    fig.add_annotation(text=signals['label'],
+                                       # put labels at the start of the x axis, as they are likely no significant
+                                       # effects in the start of the trial
+                                       x=0.2,
+                                       # draw in the negative range of y axis
+                                       y=-ttest_anova_row_height - counter_anova * ttest_anova_row_height,
+                                       xanchor="left",  # aligns the left edge
+                                       showarrow=False,
+                                       font=dict(size=anova_annotations_font_size, color=anova_annotations_colour))
+                # increase counter of lines drawn
+                counter_anova = counter_anova + 1
+        # hide ticks of negative values on y axis assuming that ticks are at step of 5
+        # calculate number of rows below x-axis (from t-test and anova)
+        n_rows = counter_ttest + (counter_anova - counter_ttest if counter_anova > 0 else 0)
+
+        # extend y-axis range downwards if needed
+        min_y = -ttest_anova_row_height * (n_rows + 1)
+        max_y = yaxis_range[1]
+
+        # generate new y-axis ticks from extended min_y to max_y, but hide the negative ones
+        r = range(0, int(max_y) + 1, yaxis_step)
+        tickvals = list(r)
+        ticktext = [str(t) if t >= 0 else '' for t in r]
+
+        # apply updated layout
+        fig.update_layout(yaxis=dict(
+            range=[min_y, max_y],
+            tickvals=tickvals,
+            ticktext=ticktext
+        ))
+
+    def save_stats_csv(self, t, p_values, name_file):
+        """Save results of statistical test in csv.
+
+        Args:
+            t (list): list of time slices.
+            p_values (list): list of p values.
+            name_file (str): name of file.
+        """
+        path = os.path.join(common.get_configs("output"), self.folder_stats)  # where to save csv
+        # build path
+        if not os.path.exists(path):
+            os.makedirs(path)
+        df = pd.DataFrame(columns=['t', 'p-value'])  # dataframe to save to csv
+        df['t'] = t
+        df['p-value'] = p_values
+        df.to_csv(os.path.join(path, name_file))
+
+    def draw_events(self, fig, yaxis_range, events, events_width, events_dash, events_colour,
+                    events_annotations_font_size, events_annotations_colour):
+        """Draw lines and annotations of events.
+
+        Args:
+            fig (figure): figure object.
+            yaxis_range (list): range of x axis in format [min, max] for the keypress plot.
+            events (list): list of events to draw formatted as values on x axis.
+            events_width (int): thickness of the vertical lines.
+            events_dash (str): type of the vertical lines.
+            events_colour (str): colour of the vertical lines.
+            events_annotations_font_size (int): font size of annotations for the vertical lines.
+            events_annotations_colour (str): colour of annotations for the vertical lines.
+        """
+        # count lines to calculate increase in coordinates of drawing
+        counter_lines = 0
+        # draw lines with annotations for events
+        if events:
+            for event in events:
+                # draw start
+                fig.add_shape(type='line',
+                              x0=event['start'],
+                              y0=0,
+                              x1=event['start'],
+                              y1=yaxis_range[1],
+                              line=dict(color=events_colour,
+                                        dash=events_dash,
+                                        width=events_width))
+                # draw other elements only is start and finish are not the same
+                if event['start'] != event['end']:
+                    # draw finish
+                    fig.add_shape(type='line',
+                                  x0=event['end'],
+                                  y0=0,
+                                  x1=event['end'],
+                                  y1=yaxis_range[1],
+                                  line=dict(color=events_colour,
+                                            dash=events_dash,
+                                            width=events_width))
+                    # draw horizontal line
+                    fig.add_annotation(ax=event['start'],
+                                       axref='x',
+                                       ay=yaxis_range[1] - counter_lines * 2 - 2,
+                                       ayref='y',
+                                       x=event['end'],
+                                       arrowcolor='black',
+                                       xref='x',
+                                       y=yaxis_range[1] - counter_lines * 2 - 2,
+                                       yref='y',
+                                       arrowwidth=events_width,
+                                       arrowside='end+start',
+                                       arrowsize=1,
+                                       arrowhead=2)
+                    # draw text label
+                    fig.add_annotation(text=event['annotation'],
+                                       x=(event['end'] + event['start']) / 2,
+                                       y=yaxis_range[1] - counter_lines * 2 - 1,  # use ylim value and draw lower
+                                       showarrow=False,
+                                       font=dict(size=events_annotations_font_size, color=events_annotations_colour))
+                # just draw text label
+                else:
+                    fig.add_annotation(text=event['annotation'],
+                                       x=event['start'] + 1.1,
+                                       y=yaxis_range[1] - counter_lines * 2 - 0.2,  # use ylim value and draw lower
+                                       showarrow=False,
+                                       font=dict(size=events_annotations_font_size, color=events_annotations_colour))
+                # increase counter of lines drawn
+                counter_lines = counter_lines + 1
