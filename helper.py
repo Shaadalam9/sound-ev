@@ -30,7 +30,6 @@ SAVE_PNG = True
 SAVE_EPS = True
 
 
-# TODO: update requirements.txt
 # TODO: Mark the time when the car has started to become visible, started to yield,
 # stopped, started to accelerate and taking a turn finally
 class HMD_helper:
@@ -124,22 +123,33 @@ class HMD_helper:
         if len(signal_1) != len(signal_2):
             logger.error('The lengths of signal_1 and signal_2 must be the same.')
             return -1
-        # convert to numpy arrays if signal_1 and signal_2 are lists
-        signal_1 = np.asarray(signal_1)
-        signal_2 = np.asarray(signal_2)
-        p_values = []  # record raw p value for each bin
-        significance = []  # record binary flag (0 or 1) if p value < tr.common.get_configs('p_value'))
-        # perform t-test for each value (treated as an independent bin)
+
+        p_values = []
+        significance = []
+        threshold = common.get_configs("p_value")
+
         for i in range(len(signal_1)):
-            if paired:
-                t_stat, p_value = ttest_rel([signal_1[i]], [signal_2[i]], axis=-1, alternative=type)
-            else:
-                t_stat, p_value = ttest_ind([signal_1[i]], [signal_2[i]], axis=-1, alternative=type, equal_var=False)
-            # record raw p value
-            p_values.append(p_value)
-            # determine significance for this value
-            significance.append(int(p_value < common.get_configs('p_value')))
-        # return raw p values and binary flags for significance for output
+            data1 = signal_1[i]
+            data2 = signal_2[i]
+
+            # Skip if data is empty
+            if not data1 or not data2 or len(data1) != len(data2) and paired:
+                p_values.append(1.0)
+                significance.append(0)
+                continue
+
+            try:
+                if paired:
+                    t_stat, p_val = ttest_rel(data1, data2, alternative=type)
+                else:
+                    t_stat, p_val = ttest_ind(data1, data2, equal_var=False, alternative=type)
+            except Exception as e:
+                logger.warning(f"Skipping t-test at time index {i} due to error: {e}")
+                p_val = 1.0
+
+            p_values.append(p_val)
+            significance.append(int(p_val < threshold))
+
         return [p_values, significance]
 
     def anova(self, signals):
@@ -229,137 +239,9 @@ class HMD_helper:
 
         return grouped_data
 
-    @staticmethod
-    def calculate_average_for_column(data_folder, mapping, column_name):
-        """
-        Calculate the average of values for a given column at each unique timestamp across grouped CSV files,
-        considering only the rows within the range of 0 to video_length / 1000 and rounding timestamps to the
-        nearest multiple of 0.02.
-
-        Args:
-            data_folder (dict): Location of the data folder.
-            column_name (str): The name of the column to calculate the average for.
-            mapping (DataFrame): A DataFrame containing the video_id and video_length information.
-
-        Returns:
-            dict: A dictionary where keys are video_ids and values are DataFrames with 'Timestamp' and average values.
-        """
-        timewise_averages = {}
-        grouped_data = HMD_helper.group_files_by_video_id(data_folder, mapping)
-
-        # TODO: use resolution param from config
-        for video_id, file_paths in grouped_data.items():
-            combined_data = []
-            # Get the corresponding video_length from the mapping
-            video_length_row = mapping.loc[mapping["video_id"] == video_id, "video_length"]
-            if video_length_row.empty:
-                logger.info(f"Video length not found for video_id: {video_id}")
-                continue
-
-            video_length = video_length_row.values[0] / 1000
-
-            for file_path in file_paths:
-                try:
-                    # Read the CSV file
-                    df = pd.read_csv(file_path)
-
-                    # Check if the necessary columns exist
-                    if 'Timestamp' in df.columns and column_name in df.columns:
-                        # Filter the DataFrame to only include rows where Timestamp >= 0 and <= video_length
-                        df = df[(df["Timestamp"] >= 0) & (df["Timestamp"] <= video_length)]
-
-                        # Round the Timestamp to the nearest multiple of 0.02
-                        df["Timestamp"] = (df["Timestamp"] / 0.02).round() * 0.02
-
-                        combined_data.append(df[['Timestamp', column_name]])
-
-                except Exception as e:
-                    logger.error(f"Error processing file {file_path}: {e}")
-
-            if combined_data:
-                # Concatenate all data for the current video_id
-                combined_df = pd.concat(combined_data)
-
-                # Group by 'Timestamp' and calculate the average for the column
-                avg_df = combined_df.groupby('Timestamp', as_index=False)[column_name].mean()
-
-                timewise_averages[video_id] = avg_df
-            else:
-                timewise_averages[video_id] = pd.DataFrame(columns=['Timestamp', column_name])
-
-        return timewise_averages
-
     def get_sound_clip_name(self, df, video_id_value):
         result = df.loc[df["video_id"] == video_id_value, "sound_clip_name"]
         return result.iloc[0] if not result.empty else None
-
-    def plot_kp(self, data_folder, mapping, output_folder, save_file=True):
-        timewise_avgs = HMD_helper.calculate_average_for_column(data_folder, mapping, 'TriggerValueRight')
-        # Create a Plotly figure
-        fig = go.Figure()
-
-        # Iterate through all trials and add traces
-        for trial_name, df in timewise_avgs.items():
-            # Ensure 'sound_clip_name' exists in the dataframe
-            legend_name = self.get_sound_clip_name(mapping, trial_name) if "sound_clip_name" in mapping.columns else trial_name  # noqa: E501
-
-            # TODO: add check for config param for smoothing
-            smoothed_values = self.smoothen_filter(df["TriggerValueRight"].tolist())
-            fig.add_trace(go.Scatter(
-                x=df["Timestamp"],
-                y=smoothed_values,
-                mode='lines',
-                name=legend_name
-            ))
-
-        # Update layout for better visualization
-        fig.update_layout(
-            xaxis_title="Timestamp (s)",
-            yaxis_title="Mean keypress value",
-            legend_title="Trials",
-            template=template
-        )
-
-        # save file to local output folder
-        if save_file:
-            # Final adjustments and display
-            fig.update_layout(margin=dict(l=10, r=10, t=10, b=10))
-            self.save_plotly(fig, 'kp', save_final=True)
-        # open it in localhost instead
-        else:
-            fig.show()
-
-    def plot_yaw_movement(self, data_folder, mapping, output_folder, save_file=True):
-        timewise_avgs = HMD_helper.calculate_average_for_column(data_folder, mapping, 'TriggerValueRight')
-        # Create a Plotly figure
-        fig = go.Figure()
-
-        # Iterate through all trials and add traces
-        for trial_name, df in timewise_avgs.items():
-            smoothed_values = self.smoothen_filter(df["TriggerValueRight"].tolist())
-            fig.add_trace(go.Scatter(
-                x=df["Timestamp"],
-                y=smoothed_values,
-                mode='lines',
-                name=trial_name
-            ))
-
-        # Update layout for better visualization
-        fig.update_layout(
-            xaxis_title="Timestamp (s)",
-            yaxis_title="Yaw",
-            legend_title="Trials",
-            template=template
-        )
-
-        # save file to local output folder
-        if save_file:
-            # Final adjustments and display
-            fig.update_layout(margin=dict(l=10, r=10, t=10, b=10))
-            self.save_plotly(fig, 'yaw_movement', save_final=True)
-        # open it in localhost instead
-        else:
-            fig.show()
 
     def gender_distribution(self, df, output_folder, save_file=True):
         # Check if df is a string (file path), and read it as a DataFrame if necessary
@@ -592,7 +474,8 @@ class HMD_helper:
                     break
 
         # create a sorted list of all trials
-        all_trials = sorted([t for t in all_trials if t != "test"], key=lambda x: int(re.search(r'\d+', x).group()))
+        all_trials = sorted([t for t in all_trials if t != "test"],
+                            key=lambda x: int(re.search(r'\d+', x).group()))  # type: ignore
         all_trials.insert(0, "test") if "test" in all_trials else None
 
         # construct separate dataframes for each slider
@@ -623,7 +506,6 @@ class HMD_helper:
             # save each slider dataframe separately
             output_path = os.path.join(output_folder, f"slider_input_{slider}.csv")
             df.to_csv(output_path, index=False)
-            logger.info(f"{slider} data saved to {output_path}")
 
     def save_plotly(self, fig, name, remove_margins=False, width=1320, height=680, save_eps=True, save_png=True,
                     save_html=True, open_browser=True, save_mp4=False, save_final=False):
@@ -756,9 +638,9 @@ class HMD_helper:
             y_legend_bar (list, optional): names for variables for bar data to be shown in the legend.
             line_width (int): width of the keypress line.
         """
-        logger.info('Creating figure keypress and slider data for {}.', df.index.tolist())
+        # logger.info('Creating figure keypress and slider data for {}.', df.index.tolist())
         # calculate times
-        times = np.array(range(self.res, df['video_length'].max() + self.res, self.res)) / 1000
+        times = df['Timestamp'].values
         # plotly
         fig = subplots.make_subplots(rows=2,
                                      cols=2,
@@ -779,17 +661,21 @@ class HMD_helper:
             # assume one row takes ttest_anova_row_height on y axis
             yaxis_kp_range[0] = round(yaxis_kp_range[0] - len(anova_signals) * ttest_anova_row_height - ttest_anova_row_height)  # noqa: E501  # type: ignore
         # plot keypress data
-        for index, row in df.iterrows():
-            values = row['kp']  # keypress data
-            row_number = df.index.get_loc(index)  # get the row number
-            # custom labels for legend
+        for row_number, key in enumerate(y):
+            values = df[key]  # or whatever logic fits
             if y_legend_kp:
                 name = y_legend_kp[row_number]
             else:
-                name = os.path.splitext(index)[0]
+                name = key
             # smoothen signal
             if self.smoothen_signal:
-                values = self.smoothen_filter(values)
+                pass
+                if isinstance(values, pd.Series):
+                    values = values.tolist()
+                    values = self.smoothen_filter(values)
+                # if not isinstance(values, (list, tuple, np.ndarray)):
+                #     values = [values]
+                # values = self.smoothen_filter(values)
             # plot signal
             fig.add_trace(go.Scatter(y=values,
                                      mode='lines',
@@ -807,7 +693,7 @@ class HMD_helper:
                          events_colour=events_colour,
                          events_annotations_font_size=events_annotations_font_size,
                          events_annotations_colour=events_annotations_colour)
-        # update axis
+
         # update axis
         if xaxis_step:
             fig.update_xaxes(title_text=xaxis_kp_title, range=xaxis_kp_range, dtick=xaxis_step, row=1, col=1)
@@ -827,57 +713,7 @@ class HMD_helper:
         # use index of df if none is given
         if not x:
             x = df.index
-        # plot 1st variable on top
-        # showing text labels
-        if show_text_labels:
-            text = df[y[0]]
-        else:
-            text = None
-        # custom labels for legend
-        if y_legend_bar:
-            name = y_legend_bar[0]
-        else:
-            name = y[0]
-        # # plot variable
-        # if bar_font_size:
-        #     font_size = bar_font_size
-        # else:
-        #     font_size = font_size
-        fig.add_trace(go.Bar(x=x,
-                             y=df[y[0]],
-                             name=name,
-                             orientation=orientation,
-                             text=text,
-                             textfont=dict(size=bar_font_size),
-                             textposition='auto',
-                             marker=dict(
-                                color='purple'  # bar color
-                             )),
-                      row=1,
-                      col=2)
-        # plot 2nd variable at bottom
-        if show_text_labels:
-            text = df[y[1]]
-        else:
-            text = None
-        # custom labels for legend
-        if y_legend_bar:
-            name = y_legend_bar[1]
-        else:
-            name = y[1]
-        # plot variable
-        fig.add_trace(go.Bar(x=x,
-                             y=df[y[1]],
-                             name=name,
-                             orientation=orientation,
-                             text=text,
-                             textfont=dict(size=bar_font_size),
-                             textposition='auto',
-                             marker=dict(
-                                color='orange'  # bar color
-                             )),
-                      row=2,
-                      col=2)
+
         # draw ttest and anova rows
         self.draw_ttest_anova(fig=fig,
                               times=times,
@@ -991,8 +827,11 @@ class HMD_helper:
                 [p_values, significance] = self.ttest(signal_1=signals['signal_1'],
                                                       signal_2=signals['signal_2'],
                                                       paired=signals['paired'])  # type: ignore
+
                 # save results to csv
-                self.save_stats_csv(t=list(range(len(signals['signal_1']))),
+                time_step = 0.02  # or read from config if defined elsewhere
+                timestamps = [round(i * time_step, 2) for i in range(len(signals['signal_1']))]
+                self.save_stats_csv(t=timestamps,
                                     p_values=p_values,
                                     name_file=signals['label'] + '_' + name_file + '.csv')
                 # only proceed if there are significant results
@@ -1001,12 +840,14 @@ class HMD_helper:
                     # plot stars based on random lists
                     marker_x = []  # x-coordinates for stars
                     marker_y = []  # y-coordinates for stars
+
                     # assuming `times` and `signals['signal_1']` correspond to x and y data points
                     for i in range(len(significance)):
                         if significance[i] == 1:  # if value indicates a star
                             marker_x.append(times[i])  # use the corresponding x-coordinate
                             # dynamically set y-coordinate, offset by ttest_anova_row_height for each signal_index
                             marker_y.append(-ttest_anova_row_height - counter_ttest * ttest_anova_row_height)
+
                     # add scatter plot trace with cleaned data
                     fig.add_trace(go.Scatter(x=marker_x,
                                              y=marker_y,
@@ -1186,3 +1027,184 @@ class HMD_helper:
                                        font=dict(size=events_annotations_font_size, color=events_annotations_colour))
                 # increase counter of lines drawn
                 counter_lines = counter_lines + 1
+
+    def avg_csv_files(self, data_folder, mapping):
+
+        grouped_data = HMD_helper.group_files_by_video_id(data_folder, mapping)
+
+        for video_id, file_locations in grouped_data.items():
+            combined_data = []
+            video_length_row = mapping.loc[mapping["video_id"] == video_id, "video_length"]
+            if video_length_row.empty:
+                logger.info(f"Video length not found for video_id: {video_id}")
+                continue
+
+            video_length = video_length_row.values[0] / 1000
+            for file_location in file_locations:
+                df = pd.read_csv(file_location)
+
+                # Filter the DataFrame to only include rows where Timestamp >= 0 and <= video_length
+                df = df[(df["Timestamp"] >= 0) & (df["Timestamp"] <= video_length)]
+
+                # Round the Timestamp to the nearest multiple of 0.02
+                df["Timestamp"] = (df["Timestamp"] / 0.02).round() * 0.02
+
+                combined_data.append(df)
+
+            # Concatenate all DataFrames row-wise
+            combined_df = pd.concat(combined_data, ignore_index=True)
+
+            # Group by 'Timestamp' and calculate the average for the column
+            avg_df = combined_df.groupby('Timestamp', as_index=False).mean()
+
+            # Save dataframe in the output folder
+            avg_df.to_csv(os.path.join(common.get_configs("output"), f"{video_id}_avg_df.csv"))
+
+    def export_participant_trigger_matrix(self, data_folder, video_id, output_file, mapping):
+        """
+        Export a matrix of TriggerValueRight values per participant for a given video.
+
+        Args:
+            data_folder (str): Path to folder containing participant data.
+            video_id (str): Target video_id (e.g. '002', 'test', etc.).
+            output_file (str): Path to output CSV file (e.g. '_output/participant_trigger_002.csv').
+            mapping (DataFrame): The mapping DataFrame containing video length info.
+        """
+        participant_matrix = {}
+        all_timestamps = set()
+
+        for folder in sorted(os.listdir(data_folder)):
+            folder_path = os.path.join(data_folder, folder)
+            if not os.path.isdir(folder_path):
+                continue
+
+            match = re.match(r'Participant_(\d+)_', folder)
+            if not match:
+                continue
+            participant_id = int(match.group(1))
+
+            for file in os.listdir(folder_path):
+                if f"_{video_id}.csv" in file:
+                    file_path = os.path.join(folder_path, file)
+                    df = pd.read_csv(file_path)
+
+                    if "Timestamp" not in df or "TriggerValueRight" not in df:
+                        continue
+
+                    # Round timestamps to 0.02s resolution
+                    df["Timestamp"] = (df["Timestamp"] / 0.02).round() * 0.02
+
+                    # Store trigger values
+                    participant_matrix[f"P{participant_id}"] = dict(zip(df["Timestamp"], df["TriggerValueRight"]))
+                    all_timestamps.update(df["Timestamp"])
+                    break
+
+        # Get aligned timestamps based on video length from mapping
+        video_length_row = mapping.loc[mapping["video_id"] == video_id, "video_length"]
+        if not video_length_row.empty:
+            video_length_sec = video_length_row.values[0] / 1000  # convert ms to sec
+            all_timestamps = np.round(np.arange(0, video_length_sec + 0.02, 0.02), 2).tolist()
+
+            # Save timestamps
+            ts_output_path = output_file.replace(".csv", "_timestamps.csv")
+            pd.DataFrame({"Timestamp": all_timestamps}).to_csv(ts_output_path, index=False)
+            logger.info(f"Saved timestamp range for video {video_id} to {ts_output_path}")
+        else:
+            logger.warning(f"Video length not found in mapping for video_id {video_id}")
+
+        # Build DataFrame
+        combined_df = pd.DataFrame({"Timestamp": all_timestamps})
+        for participant, values in participant_matrix.items():
+            combined_df[participant] = combined_df["Timestamp"].map(values).fillna(0)
+
+        combined_df.to_csv(output_file, index=False)
+        logger.info(f"Exported participant trigger matrix for video {video_id} to {output_file}")
+
+    def plot(self, mapping):
+        """
+        Generate a comparison plot of keypress data and subjective slider ratings
+        across different video trials relative to a test condition.
+
+        This function processes participant trigger matrices for each trial,
+        aligns timestamps, attaches slider-based subjective ratings (annoyance,
+        informativeness, noticeability), and prepares data for visualization
+        including significance testing (t-tests) between the test condition and each trial.
+
+        Args:
+            mapping (pd.DataFrame): A dataframe containing metadata about videos,
+                                    including 'video_id' and 'sound_clip_name'.
+        """
+        # Filter out the 'test' and 'est' video IDs from further processing
+        video_id = mapping["video_id"]
+        video_id = video_id[~video_id.isin(["test", "est"])]
+
+        all_dfs = []         # List to collect averaged keypress data per trial
+        all_labels = []      # List to store corresponding sound labels
+        ttest_signals = []   # List to hold signals for pairwise t-test analysis
+
+        data_folder = common.get_configs("data")  # Fetch path to data directory
+
+        # --- Prepare TEST Data (used as baseline for comparison) ---
+        self.export_participant_trigger_matrix(
+            data_folder=data_folder,
+            video_id="test",
+            output_file="_output/participant_trigger_test.csv",
+            mapping=mapping
+        )
+
+        # Load the test participant keypress matrix
+        test_raw_df = pd.read_csv("_output/participant_trigger_test.csv")
+        test_matrix = test_raw_df.drop(columns=["Timestamp"]).values.tolist()
+
+        # --- Process Each Trial Video ---
+        for video in video_id:
+            display_name = mapping.loc[mapping["video_id"] == video, "display_name"].values[0]
+
+            # Export and align participant keypress matrix for the current video
+            self.export_participant_trigger_matrix(
+                data_folder=data_folder,
+                video_id=video,
+                output_file=f"_output/participant_trigger_{video}.csv",
+                mapping=mapping
+            )
+
+            # Load keypress matrix for current video
+            trial_raw_df = pd.read_csv(f"_output/participant_trigger_{video}.csv")
+            trial_matrix = trial_raw_df.drop(columns=["Timestamp"]).values.tolist()
+
+            # Load averaged keypress signal over time
+            df = pd.read_csv(f"_output/{video}_avg_df.csv")
+
+            # Append data and label for plotting
+            all_dfs.append(df)
+            all_labels.append(display_name)
+
+            # Store signals for statistical comparison with test condition
+            ttest_signals.append({
+                "signal_1": test_matrix,
+                "signal_2": trial_matrix,
+                "paired": True,
+                "label": f"{display_name}"
+            })
+
+        # --- Combine DataFrames for Plotting ---
+        combined_df = pd.DataFrame()
+        combined_df["Timestamp"] = all_dfs[0]["Timestamp"]  # Assumes all trials share the same time index
+
+        for df, label in zip(all_dfs, all_labels):
+            combined_df[label] = df["TriggerValueRight"]
+
+        # --- Generate Plot ---
+        self.plot_kp_slider_videos(
+            df=combined_df,
+            y=all_labels,
+            y_legend_kp=all_labels,
+            yaxis_kp_range=[0, 1],
+            yaxis_slider_title="Slider rating (%)",
+            name_file="all_videos_kp_slider_plot",
+            show_text_labels=True,
+            pretty_text=True,
+            stacked=False,
+            ttest_signals=ttest_signals,
+            ttest_anova_row_height=0.02
+        )
