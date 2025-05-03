@@ -33,7 +33,6 @@ if __name__ == "__main__":
     HMD.read_slider_data(data_folder, mapping, output_folder)
     HMD.gender_distribution(intake_questionnaire, output_folder)
     HMD.age_distribution(intake_questionnaire, output_folder)
-    HMD.demographic_distribution(intake_questionnaire, output_folder)
     HMD.avg_csv_files(data_folder, mapping)
     HMD.plot(mapping, column_name="TriggerValueRight")
     HMD.plot_yaw(mapping)

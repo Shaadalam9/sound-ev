@@ -22,7 +22,6 @@ from scipy.stats import ttest_rel, ttest_ind, f_oneway
 from scipy.spatial.transform import Rotation as R, Slerp
 from statsmodels.stats.anova import anova_lm
 from statsmodels.formula.api import ols
-import settings_dir as settings_dir
 
 logger = CustomLogger(__name__)  # use custom logger
 template = common.get_configs("plotly_template")
@@ -402,127 +401,6 @@ class HMD_helper:
             fig.show()
 
     @staticmethod
-    def replace_nationality_variations(df):
-        # Define a dictionary mapping variations of nationality names to consistent values
-        nationality_replacements = {
-            "NL": "Netherlands",
-            "The Netherlands": "Netherlands",
-            "netherlands": "Netherlands",
-            "Netherlands ": "Netherlands",
-            "Nederlandse": "Netherlands",
-            "Dutch": "Netherlands",
-            "Bulgarian": "Bulgaria",
-            "bulgarian": "Bulgaria",
-            "INDIA": "India",
-            "Indian": "India",
-            "indian": "India",
-            "italian": "Italy",
-            "Italian": "Italy",
-            "Chinese": "China",
-            "Austrian": "Austria",
-            "Maltese": "Malta",
-            "Indonesian": "Indonesia",
-            "Portuguese": "Portugal",
-            "Romanian": "Romania",
-            "American": "United States",
-            "Ghanaian": "Ghana",
-            "Peruvian": "Peru",
-            "greek": "Greece"
-        }
-
-        # Replace all variations of nationality with the consistent values using a dictionary
-        df['What is your nationality?'] = df['What is your nationality?'].replace(nationality_replacements, regex=True)
-
-        return df
-
-    @staticmethod
-    def rotate_image_90_degrees(image_url):
-        """Rotates an image from the URL by 90 degrees and converts it to base64."""
-        response = requests.get(image_url)
-        img = Image.open(BytesIO(response.content))
-        rotated_img = img.rotate(90, expand=True)  # Rotate the image by 90 degrees
-        # Save the rotated image to a BytesIO object
-        rotated_image_io = BytesIO()
-        rotated_img.save(rotated_image_io, format="PNG")
-        rotated_image_io.seek(0)
-
-        # Convert the rotated image to base64
-        base64_image = base64.b64encode(rotated_image_io.read()).decode('utf-8')
-        return f"data:image/png;base64,{base64_image}"
-
-    @staticmethod
-    def demographic_distribution(df, output_folder):
-        # Check if df is a string (file path), and read it as a DataFrame if necessary
-        if isinstance(df, str):
-            df = pd.read_csv(df)
-
-        df = HMD_helper.replace_nationality_variations(df)
-
-        # Count the occurrences of each age
-        demo_counts = df.groupby('What is your nationality?').size().reset_index(name='count')
-
-        # Convert the 'What is your age (in years)?' column to numeric (ignoring errors for non-numeric values)
-        demo_counts['What is your nationality??'] = pd.to_numeric(demo_counts['What is your nationality?'],
-                                                                  errors='coerce')
-
-        # Drop any NaN values that may arise from invalid age entries
-        demo_counts = demo_counts.dropna(subset=['What is your nationality?'])
-
-        # Extract data for plotting
-        demo = demo_counts['What is your nationality?'].tolist()
-        counts = demo_counts['count'].tolist()
-
-        # Fetch flag image URLs and rotate images based on nationality
-        flag_images = {}
-        for country in demo:
-            flag_url = HMD_helper.get_flag_image_url(country)
-            if flag_url:
-                rotated_image_base64 = HMD_helper.rotate_image_90_degrees(flag_url)  # Rotate the image by 90 degrees
-                flag_images[country] = rotated_image_base64  # Store the base64-encoded rotated image
-
-        # Create the bar chart (basic bars without filling)
-        fig = go.Figure(data=[
-            go.Bar(name='Country', x=demo, y=counts, marker=dict(color='white', line=dict(color='black', width=1)))
-        ])
-
-        # Calculate width of each bar for full image fill
-        bar_width = (1.0 / len(demo)) * 8.8  # Assuming evenly spaced bars
-
-        # Add flag images as overlays for each country
-        for i, country in enumerate(demo):
-            if country in flag_images:
-                fig.add_layout_image(
-                    dict(
-                        source=flag_images[country],  # Embed the base64-encoded rotated image
-                        xref="x",
-                        yref="y",
-                        x=country,  # Position the image on the x-axis at the correct bar
-                        y=counts[i],  # Position the image at the top of the bar
-                        sizex=bar_width,  # Adjust the width of the flag image
-                        sizey=counts[i],  # Adjust the height of the flag to fit the bar height
-                        xanchor="center",
-                        yanchor="top",
-                        sizing="stretch"
-                    )
-                )
-
-        # Update layout
-        fig.update_layout(
-            xaxis_title='Country',
-            yaxis_title='Number of participant',
-            xaxis=dict(tickmode='array', tickvals=demo, ticktext=demo),
-            margin=dict(l=40, r=40, t=40, b=40)
-        )
-
-        # Save the figure in different formats
-        base_filename = "demographic"
-        fig.write_image(os.path.join(output_folder, base_filename + ".png"), width=1600, height=900, scale=3)
-        fig.write_image(os.path.join(output_folder, base_filename + ".eps"), width=1600, height=900, scale=3)
-        fig.write_image(os.path.join(output_folder, base_filename + ".svg"),
-                        width=1600, height=900, scale=3, format="svg")
-        pio.write_html(fig, file=os.path.join(output_folder, base_filename + ".html"), auto_open=True)
-
-    @staticmethod
     def read_slider_data(data_folder, mapping, output_folder):
         participant_data = {}
         all_trials = set()
@@ -606,11 +484,11 @@ class HMD_helper:
             save_final (bool, optional): whether to save the "good" final figure.
         """
         # build path
-        path = os.path.join(settings_dir.output_dir, self.folder_figures)
+        path = os.path.join(common.get_configs("output"), self.folder_figures)
         if not os.path.exists(path):
             os.makedirs(path)
         # build path for final figure
-        path_final = os.path.join(settings_dir.root_dir, self.folder_figures)
+        path_final = os.path.join(common.get_configs("figures"), self.folder_figures)
         if save_final and not os.path.exists(path_final):
             os.makedirs(path_final)
         # limit name to max 200 char (for Windows)
@@ -653,70 +531,76 @@ class HMD_helper:
                               events_dash='dot', events_colour='black', events_annotations_font_size=20,
                               events_annotations_colour='black', xaxis_kp_title='Time (s)',
                               yaxis_kp_title='Percentage of trials with response key pressed',
-                              xaxis_kp_range=None, yaxis_kp_range=None, stacked=False, pretty_text=False,
-                              orientation='v', xaxis_slider_title='Stimulus', yaxis_slider_show=False,
-                              yaxis_slider_title=None, show_text_labels=False, xaxis_ticklabels_slider_show=True,
-                              yaxis_ticklabels_slider_show=False, name_file='kp_videos_sliders', save_file=False,
-                              save_final=False, fig_save_width=1320, fig_save_height=680, legend_x=0.7, legend_y=0.95,
+                              xaxis_kp_title_offset=0, yaxis_kp_title_offset=0,
+                              xaxis_kp_range=None, yaxis_kp_range=None, stacked=False,
+                              pretty_text=False, orientation='v', xaxis_slider_title='Stimulus',
+                              yaxis_slider_show=False, yaxis_slider_title=None, show_text_labels=False,
+                              xaxis_ticklabels_slider_show=True, yaxis_ticklabels_slider_show=False,
+                              name_file='kp_videos_sliders', save_file=False, save_final=False,
+                              fig_save_width=1320, fig_save_height=680, legend_x=0.7, legend_y=0.95,
                               font_family=None, font_size=None, ttest_signals=None, ttest_marker='circle',
                               ttest_marker_size=3, ttest_marker_colour='black', ttest_annotations_font_size=10,
                               ttest_annotations_colour='black', anova_signals=None, anova_marker='cross',
                               anova_marker_size=3, anova_marker_colour='black', anova_annotations_font_size=10,
                               anova_annotations_colour='black', ttest_anova_row_height=0.5, xaxis_step=5,
                               yaxis_step=5, y_legend_bar=None, line_width=1, bar_font_size=None):
-        """Plot keypresses with multiple variables as a filter and slider questions for the stimuli.
+        """
+        Plot keypresses with multiple variables as a filter and slider questions for the stimuli.
 
         Args:
-            df (dataframe): dataframe with stimuli data.
-            y (list): column names of dataframe to plot.
-            y_legend_kp (list, optional): names for variables for keypress data to be shown in the legend.
-            x (list): values in index of dataframe to plot for. If no value is given, the index of df is used.
-            events (list, optional): list of events to draw formatted as values on x axis.
-            events_width (int, optional): thickness of the vertical lines.
-            events_dash (str, optional): type of the vertical lines.
-            events_colour (str, optional): colour of the vertical lines.
-            events_annotations_font_size (int, optional): font size of annotations for the vertical lines.
-            events_annotations_colour (str, optional): colour of annotations for the vertical lines.
-            xaxis_kp_title (str, optional): title for x axis. for the keypress plot
-            yaxis_kp_title (str, optional): title for y axis. for the keypress plot
-            xaxis_kp_range (None, optional): range of x axis in format [min, max] for the keypress plot.
-            yaxis_kp_range (None, optional): range of x axis in format [min, max] for the keypress plot.
-            stacked (bool, optional): show as stacked chart.
-            pretty_text (bool, optional): prettify ticks by replacing _ with spaces and capitalising each value.
-            orientation (str, optional): orientation of bars. v=vertical, h=horizontal.
-            xaxis_slider_title (None, optional): title for x axis. for the slider data plot.
-            yaxis_slider_show (bool, optional): show y axis or not.
-            yaxis_slider_title (None, optional): title for y axis. for the slider data plot.
-            show_text_labels (bool, optional): output automatically positioned text labels.
-            xaxis_ticklabels_slider_show (bool, optional): show tick labels for slider plot.
-            yaxis_ticklabels_slider_show (bool, optional): show tick labels for slider plot.
-            name_file (str, optional): name of file to save.
-            save_file (bool, optional): flag for saving an html file with plot.
-            save_final (bool, optional): flag for saving an a final figure to /figures.
-            fig_save_width (int, optional): width of figures to be saved.
-            fig_save_height (int, optional): height of figures to be saved.
-            legend_x (float, optional): location of legend, percentage of x axis.
-            legend_y (float, optional): location of legend, percentage of y axis.
-            font_family (str, optional): font family to be used across the figure. None = use config value.
-            font_size (int, optional): font size to be used across the figure. None = use config value.
-            ttest_signals (list, optional): signals to compare with ttest. None = do not compare.
-            ttest_marker (str, optional): symbol of markers for the ttest.
-            ttest_marker_size (int, optional): size of markers for the ttest.
-            ttest_marker_colour (str, optional): colour of markers for the ttest.
-            ttest_annotations_font_size (int, optional): font size of annotations for ttest.
-            ttest_annotations_colour (str, optional): colour of annotations for ttest.
-            anova_signals (dict, optional): signals to compare with ANOVA. None = do not compare.
-            anova_marker (str, optional): symbol of markers for the ANOVA.
-            anova_marker_size (int, optional): size of markers for the ANOVA.
-            anova_marker_colour (str, optional): colour of markers for the ANOVA.
-            anova_annotations_font_size (int, optional): font size of annotations for ANOVA.
-            anova_annotations_colour (str, optional): colour of annotations for ANOVA.
-            ttest_anova_row_height (int, optional): height of row of ttest/anova markers.
-            xaxis_step (int): step between ticks on x axis.
-            yaxis_step (float): step between ticks on y axis.
-            y_legend_bar (list, optional): names for variables for bar data to be shown in the legend.
-            line_width (int): width of the keypress line.
+            df (dataframe): DataFrame with stimuli data.
+            y (list): Column names of DataFrame to plot.
+            y_legend_kp (list, optional): Names for variables for keypress data to be shown in the legend.
+            x (list, optional): Values in index of DataFrame to plot for. If None, the index of df is used.
+            events (list, optional): List of events to draw, formatted as values on x axis.
+            events_width (int, optional): Thickness of the vertical lines.
+            events_dash (str, optional): Style of the vertical lines (e.g., 'dot', 'dash').
+            events_colour (str, optional): Colour of the vertical lines.
+            events_annotations_font_size (int, optional): Font size for annotations on vertical lines.
+            events_annotations_colour (str, optional): Colour for annotations on vertical lines.
+            xaxis_kp_title (str, optional): Title for x axis of the keypress plot.
+            yaxis_kp_title (str, optional): Title for y axis of the keypress plot.
+            xaxis_kp_title_offset (float, optional): Horizontal offset for x axis title of keypress plot.
+            yaxis_kp_title_offset (float, optional): Vertical offset for y axis title of keypress plot.
+            xaxis_kp_range (list or None, optional): Range of x axis in format [min, max] for keypress plot.
+            yaxis_kp_range (list or None, optional): Range of y axis in format [min, max] for keypress plot.
+            stacked (bool, optional): Whether to show bars as stacked chart.
+            pretty_text (bool, optional): Prettify tick labels by replacing underscores with spaces and capitalizing.
+            orientation (str, optional): Orientation of bars; 'v' = vertical, 'h' = horizontal.
+            xaxis_slider_title (str, optional): Title for x axis of the slider data plot.
+            yaxis_slider_show (bool, optional): Whether to show y axis on slider plot.
+            yaxis_slider_title (str, optional): Title for y axis of the slider data plot.
+            show_text_labels (bool, optional): Whether to output automatically positioned text labels.
+            xaxis_ticklabels_slider_show (bool, optional): Whether to show tick labels for slider x axis.
+            yaxis_ticklabels_slider_show (bool, optional): Whether to show tick labels for slider y axis.
+            name_file (str, optional): Name of file to save.
+            save_file (bool, optional): Whether to save the plot as an HTML file.
+            save_final (bool, optional): Whether to save the figure as a final image in /figures.
+            fig_save_width (int, optional): Width of the figure when saving.
+            fig_save_height (int, optional): Height of the figure when saving.
+            legend_x (float, optional): X location of legend as percentage of plot width.
+            legend_y (float, optional): Y location of legend as percentage of plot height.
+            font_family (str, optional): Font family to use in the figure.
+            font_size (int, optional): Font size to use in the figure.
+            ttest_signals (list, optional): Signals to compare using t-test.
+            ttest_marker (str, optional): Marker style for t-test points.
+            ttest_marker_size (int, optional): Size of t-test markers.
+            ttest_marker_colour (str, optional): Colour of t-test markers.
+            ttest_annotations_font_size (int, optional): Font size of t-test annotations.
+            ttest_annotations_colour (str, optional): Colour of t-test annotations.
+            anova_signals (dict, optional): Signals to compare using ANOVA.
+            anova_marker (str, optional): Marker style for ANOVA points.
+            anova_marker_size (int, optional): Size of ANOVA markers.
+            anova_marker_colour (str, optional): Colour of ANOVA markers.
+            anova_annotations_font_size (int, optional): Font size of ANOVA annotations.
+            anova_annotations_colour (str, optional): Colour of ANOVA annotations.
+            ttest_anova_row_height (float, optional): Height per row for t-test/ANOVA marker rows.
+            xaxis_step (int): Step between ticks on x axis.
+            yaxis_step (float): Step between ticks on y axis.
+            y_legend_bar (list, optional): Names for variables in bar data for legend.
+            line_width (int): Line width for keypress data plot.
         """
+
         # logger.info('Creating figure keypress and slider data for {}.', df.index.tolist())
         # calculate times
         times = df['Timestamp'].values
@@ -735,6 +619,9 @@ class HMD_helper:
             # assume one row takes ttest_anova_row_height on y axis
             yaxis_kp_range[0] = (yaxis_kp_range[0] - len(anova_signals) * ttest_anova_row_height - ttest_anova_row_height)  # noqa: E501  # type: ignore
 
+        # track plotted values to compute min/max for ticks
+        all_values = []
+
         # plot keypress data
         for row_number, key in enumerate(y):
             values = df[key]  # or whatever logic fits
@@ -749,28 +636,67 @@ class HMD_helper:
                     values = values.tolist()
                     values = self.smoothen_filter(values)
 
+            all_values.extend(values)  # type: ignore # collect values for y-axis tick range
+
+            name = y_legend_kp[row_number] if y_legend_kp else key
+
             # plot signal
             fig.add_trace(go.Scatter(y=values,
                                      mode='lines',
                                      x=times,
                                      line=dict(width=line_width),
                                      name=name), row=1, col=1)
+
         # draw events
-        self.draw_events(fig=fig,
-                         yaxis_range=yaxis_kp_range,
-                         events=events,
-                         events_width=events_width,
-                         events_dash=events_dash,
-                         events_colour=events_colour,
-                         events_annotations_font_size=events_annotations_font_size,
-                         events_annotations_colour=events_annotations_colour)
+        HMD_helper.draw_events(fig=fig,
+                               yaxis_range=yaxis_kp_range,
+                               events=events,
+                               events_width=events_width,
+                               events_dash=events_dash,
+                               events_colour=events_colour,
+                               events_annotations_font_size=events_annotations_font_size,
+                               events_annotations_colour=events_annotations_colour)
 
         # update axis
         if xaxis_step:
             fig.update_xaxes(title_text=xaxis_kp_title, range=xaxis_kp_range, dtick=xaxis_step, row=1, col=1)
         else:
             fig.update_xaxes(title_text=xaxis_kp_title, range=xaxis_kp_range, row=1, col=1)
-        fig.update_yaxes(title_text=yaxis_kp_title, showgrid=False, range=yaxis_kp_range, row=1, col=1)
+        # Find actual y range across all series
+        # actual_ymin = min([min(df[y_col]) for y_col in y])
+        # actual_ymax = max([max(df[y_col]) for y_col in y])
+        actual_ymin = min(all_values)
+        actual_ymax = max(all_values)
+
+        # Generate ticks from 0 up to actual_ymax
+        positive_ticks = np.arange(0, actual_ymax + yaxis_step, yaxis_step)
+
+        # Generate ticks from 0 down to actual_ymin (note: ymin is negative)
+        negative_ticks = np.arange(0, actual_ymin - yaxis_step, -yaxis_step)
+
+        # Combine and sort ticks
+        visible_ticks = np.sort(np.unique(np.concatenate((negative_ticks, positive_ticks))))
+
+        # Update y-axis with only relevant tick marks
+        fig.update_yaxes(
+            showgrid=True,
+            range=[actual_ymin, actual_ymax],
+            tickvals=visible_ticks,  # only show ticks for data range
+            tickformat='.2f',
+            row=1, col=1
+        )
+
+        fig.add_annotation(
+            text=yaxis_kp_title,
+            xref='paper', yref='paper',
+            x=xaxis_kp_title_offset,  # left side of the plot
+            y=0.5 + yaxis_kp_title_offset,  # middle + offset
+            showarrow=False,
+            textangle=-90,
+            # font=dict(size=font_size or common.get_configs('font_size')),
+            xanchor='center',
+            yanchor='middle'
+        )
 
         # prettify text
         if pretty_text:
@@ -901,24 +827,36 @@ class HMD_helper:
                 p_vals, sig = self.ttest(
                     signal_1=comp['signal_1'], signal_2=comp['signal_2'], paired=comp['paired']
                 )  # type: ignore
+
                 # Save csv
                 times_csv = [round(i * 0.02, 2) for i in range(len(comp['signal_1']))]
-                self.save_stats_csv(t=times_csv, p_values=p_vals, name_file=f"{comp['label']}_{name_file}.csv")
+                self.save_stats_csv(t=times_csv,
+                                    p_values=p_vals,
+                                    name_file=f"{comp['label']}_{name_file}.csv")
+
                 if any(sig):
                     xs, ys = [], []
                     y_offset = original_min - ttest_anova_row_height * (counter_ttest + 1)
                     for i, s in enumerate(sig):
                         if s:
-                            xs.append(times[i]); ys.append(y_offset)
+                            xs.append(times[i])
+                            ys.append(y_offset)
                     # plot markers
-                    fig.add_trace(go.Scatter(x=xs, y=ys, mode='markers',
-                                             marker=dict(symbol=ttest_marker, size=ttest_marker_size,
+                    fig.add_trace(go.Scatter(x=xs,
+                                             y=ys,
+                                             mode='markers',
+                                             marker=dict(symbol=ttest_marker,
+                                                         size=ttest_marker_size,
                                                          color=ttest_marker_colour),
-                                             text=p_vals, showlegend=False,
+                                             text=p_vals,
+                                             showlegend=False,
                                              hovertemplate=f"{comp['label']}: time=%{{x}}, p=%{{text}}"))
                     # label row
                     fig.add_annotation(x=times[0] - (times[-1] - times[0]) * 0.0,
-                                       y=y_offset, text=comp['label'], xanchor='right', showarrow=False,
+                                       y=y_offset,
+                                       text=comp['label'],
+                                       xanchor='right',
+                                       showarrow=False,
                                        font=dict(size=ttest_annotations_font_size,
                                                  color=ttest_annotations_colour))
                     counter_ttest += 1
@@ -931,19 +869,29 @@ class HMD_helper:
                 self.save_stats_csv(t=list(range(len(comp['signals'][0]))),
                                     p_values=p_vals,
                                     name_file=f"{comp['label']}_{name_file}.csv")
+
                 if any(sig):
                     xs, ys = [], []
                     y_offset = original_min - ttest_anova_row_height * (counter_anova + 1)
                     for i, s in enumerate(sig):
                         if s:
-                            xs.append(times[i]); ys.append(y_offset)
-                    fig.add_trace(go.Scatter(x=xs, y=ys, mode='markers',
-                                             marker=dict(symbol=anova_marker, size=anova_marker_size,
+                            xs.append(times[i])
+                            ys.append(y_offset)
+
+                    fig.add_trace(go.Scatter(x=xs,
+                                             y=ys,
+                                             mode='markers',
+                                             marker=dict(symbol=anova_marker,
+                                                         size=anova_marker_size,
                                                          color=anova_marker_colour),
-                                             text=p_vals, showlegend=False,
+                                             text=p_vals,
+                                             showlegend=False,
                                              hovertemplate=f"{comp['label']}: time=%{{x}}, p=%{{text}}"))
                     fig.add_annotation(x=times[0] - (times[-1] - times[0]) * 0.05,
-                                       y=y_offset, text=comp['label'], xanchor='right', showarrow=False,
+                                       y=y_offset,
+                                       text=comp['label'],
+                                       xanchor='right',
+                                       showarrow=False,
                                        font=dict(size=anova_annotations_font_size,
                                                  color=anova_annotations_colour))
                 counter_anova += 1
@@ -975,7 +923,8 @@ class HMD_helper:
         df['p-value'] = p_values
         df.to_csv(os.path.join(path, name_file))
 
-    def draw_events(self, fig, yaxis_range, events, events_width, events_dash, events_colour,
+    @staticmethod
+    def draw_events(fig, yaxis_range, events, events_width, events_dash, events_colour,
                     events_annotations_font_size, events_annotations_colour):
         """Draw lines and annotations of events.
 
@@ -1045,16 +994,36 @@ class HMD_helper:
                 counter_lines = counter_lines + 1
 
     def avg_csv_files(self, data_folder, mapping):
+        """
+        Averages multiple CSV files corresponding to the same video ID. Each file is expected to contain
+        time-series data, including quaternion rotations and potentially other columns. The output is a
+        CSV file with averaged values for each timestamp across the files.
+
+        Parameters:
+            data_folder (str): Path to the folder containing input CSV files.
+            mapping (pd.DataFrame): A DataFrame containing metadata, including 'video_id' and 'video_length'.
+
+        Outputs:
+            For each video_id, saves an averaged DataFrame as a CSV in the output directory.
+            The output CSV is named as "<video_id>_avg_df.csv".
+        """
+
+        # Group file paths by video_id using a helper function
         grouped_data = HMD_helper.group_files_by_video_id(data_folder, mapping)
 
+        # Process each video ID and its associated files
         for video_id, file_locations in grouped_data.items():
             all_dfs = []
+
+            # Retrieve the video length from the mapping DataFrame
             video_length_row = mapping.loc[mapping["video_id"] == video_id, "video_length"]
             if video_length_row.empty:
                 logger.info(f"Video length not found for video_id: {video_id}")
                 continue
 
-            video_length = video_length_row.values[0] / 1000
+            video_length = video_length_row.values[0] / 1000  # Convert milliseconds to seconds
+
+            # Read and process each file associated with the video ID
             for file_location in file_locations:
                 df = pd.read_csv(file_location)
 
@@ -1066,6 +1035,7 @@ class HMD_helper:
 
                 all_dfs.append(df)
 
+            # Skip if no dataframes were collected
             if not all_dfs:
                 continue
 
@@ -1079,7 +1049,7 @@ class HMD_helper:
             for timestamp, group in grouped:
                 row = {'Timestamp': timestamp}
 
-                # Quaternion SLERP averaging
+                # Perform SLERP-based quaternion averaging if quaternion columns are present
                 if {"HMDRotationW", "HMDRotationX", "HMDRotationY", "HMDRotationZ"}.issubset(group.columns):
                     quats = group[["HMDRotationW", "HMDRotationX", "HMDRotationY", "HMDRotationZ"]].values.tolist()
                     avg_quat = self.average_quaternions_slerp(quats)
@@ -1091,14 +1061,17 @@ class HMD_helper:
                     })
 
                 # Average all remaining columns (excluding Timestamp and quaternion cols)
-                other_cols = [col for col in group.columns if col not in ["Timestamp", "HMDRotationW",
-                                                                          "HMDRotationX", "HMDRotationY",
+                other_cols = [col for col in group.columns if col not in ["Timestamp",
+                                                                          "HMDRotationW",
+                                                                          "HMDRotationX",
+                                                                          "HMDRotationY",
                                                                           "HMDRotationZ"]]
                 for col in other_cols:
                     row[col] = group[col].mean()
 
                 avg_rows.append(row)
 
+            # Create a new DataFrame from the averaged rows
             avg_df = pd.DataFrame(avg_rows)
 
             # Save dataframe in the output folder
@@ -1205,7 +1178,10 @@ class HMD_helper:
                     df["Timestamp"] = df["Timestamp"].round(2)
 
                     # Group by timestamp and compute yaw
-                    yaw_by_time = df.groupby("Timestamp")[["HMDRotationW", "HMDRotationX", "HMDRotationY", "HMDRotationZ"]].apply(
+                    yaw_by_time = df.groupby("Timestamp")[["HMDRotationW",
+                                                           "HMDRotationX",
+                                                           "HMDRotationY",
+                                                           "HMDRotationZ"]].apply(
                         lambda group: self.quaternion_to_euler(*self.average_quaternions_slerp(group.values))[2]  # yaw
                     ).reset_index(name="Yaw")
 
@@ -1252,7 +1228,7 @@ class HMD_helper:
         """
         # Filter out the 'test' and 'est' video IDs from further processing
         video_id = mapping["video_id"]
-        video_id = video_id[~video_id.isin(["test", "est"])]
+        plot_videos = video_id[~video_id.isin(["est"])]
 
         all_dfs = []
         all_labels = []
@@ -1272,8 +1248,8 @@ class HMD_helper:
         test_raw_df = pd.read_csv(f"_output/participant_{column_name}_test.csv")
         test_matrix = test_raw_df.drop(columns=["Timestamp"]).values.tolist()
 
-        # Process each trial
-        for video in video_id:
+        # Process each video (including 'test')
+        for video in plot_videos:
             display_name = mapping.loc[mapping["video_id"] == video, "display_name"].values[0]
 
             self.export_participant_trigger_matrix(
@@ -1289,19 +1265,20 @@ class HMD_helper:
 
             df = pd.read_csv(f"_output/{video}_avg_df.csv")
 
-            # Check if the column exists
             if column_name not in df.columns:
                 raise ValueError(f"Column '{column_name}' not found in file: _output/{video}_avg_df.csv")
 
             all_dfs.append(df)
             all_labels.append(display_name)
 
-            ttest_signals.append({
-                "signal_1": test_matrix,
-                "signal_2": trial_matrix,
-                "paired": True,
-                "label": f"{display_name}"
-            })
+            # Skip t-test if comparing test to itself
+            if video != "test":
+                ttest_signals.append({
+                    "signal_1": test_matrix,
+                    "signal_2": trial_matrix,
+                    "paired": True,
+                    "label": f"{display_name}"
+                })
 
         # Combine DataFrames
         combined_df = pd.DataFrame()
@@ -1317,6 +1294,8 @@ class HMD_helper:
             y_legend_kp=all_labels,
             yaxis_kp_range=[0.45, 1],
             yaxis_slider_title="Slider rating (%)",
+            xaxis_kp_title_offset=-0.035,  # type: ignore
+            yaxis_kp_title_offset=0.18,  # type: ignore
             name_file=f"all_videos_kp_slider_plot_{column_name}",
             show_text_labels=True,
             pretty_text=True,
@@ -1325,9 +1304,11 @@ class HMD_helper:
             ttest_anova_row_height=0.03,
             legend_x=0.78,
             legend_y=1,
-            yaxis_step=0.25,
+            xaxis_step=3,
+            yaxis_step=0.25,  # type: ignore
             line_width=3,
-            save_file=True
+            save_file=True,
+            save_final=True
         )
 
     def plot_yaw(self, mapping, column_name="Yaw"):
@@ -1348,7 +1329,7 @@ class HMD_helper:
         """
         # Filter out the 'test' and 'est' video IDs from further processing
         video_id = mapping["video_id"]
-        video_id = video_id[~video_id.isin(["test", "est"])]
+        plot_videos = video_id[~video_id.isin(["est"])]
 
         all_dfs = []
         all_labels = []
@@ -1367,8 +1348,8 @@ class HMD_helper:
         test_raw_df = pd.read_csv(f"_output/participant_{column_name}_test.csv")
         test_matrix = test_raw_df.drop(columns=["Timestamp"]).values.tolist()
 
-        # Process each trial
-        for video in video_id:
+        # Process each trial (including 'test' for plotting)
+        for video in plot_videos:
             display_name = mapping.loc[mapping["video_id"] == video, "display_name"].values[0]
 
             self.export_participant_yaw_matrix(
@@ -1388,12 +1369,14 @@ class HMD_helper:
             all_dfs.append(df)
             all_labels.append(display_name)
 
-            ttest_signals.append({
-                "signal_1": test_matrix,
-                "signal_2": trial_matrix,
-                "paired": True,
-                "label": f"{display_name}"
-            })
+            # Skip t-test of 'test' vs. itself
+            if video != "test":
+                ttest_signals.append({
+                    "signal_1": test_matrix,
+                    "signal_2": trial_matrix,
+                    "paired": True,
+                    "label": f"{display_name}"
+                })
 
         # Combine DataFrames
         combined_df = pd.DataFrame()
@@ -1407,19 +1390,23 @@ class HMD_helper:
             df=combined_df,
             y=all_labels,
             y_legend_kp=all_labels,
-            yaxis_kp_range=[0.05, 0.1],
-            yaxis_kp_title="Radian (∠)",
+            yaxis_kp_range=[0.03, 0.1],
+            yaxis_kp_title="Radian",
+            xaxis_kp_title_offset=-0.035,  # type: ignore
+            yaxis_kp_title_offset=0.22,  # type: ignore
             name_file=f"all_videos_yaw_angle_{column_name}",
             show_text_labels=True,
             pretty_text=True,
             stacked=False,
             ttest_signals=ttest_signals,
             ttest_anova_row_height=0.01,
-            yaxis_step=0.03,
+            xaxis_step=3,
+            yaxis_step=0.03,  # type: ignore
             legend_x=0.8,
             legend_y=0.2,
             line_width=3,
-            save_file=True
+            save_file=True,
+            save_final=True
         )
 
     def plot_individual_csvs_plotly(self, csv_paths, mapping_df):
@@ -1468,10 +1455,6 @@ class HMD_helper:
                 go.Bar(
                     x=display_names,
                     y=means,
-                    # text=[f"{m:.2f}<br>SD: {d:.2f}" for m, d in zip(means, deviations)],
-                    # texttemplate="%{text}",
-                    # textposition="outside",
-                    # textfont=dict(size=28),
                     name=f'CSV{i+1}',
                     showlegend=False
                 ),
@@ -1503,5 +1486,4 @@ class HMD_helper:
         )
 
         fig.update_xaxes(tickangle=45)
-
-        fig.show()
+        self.save_plotly(fig, 'bar_repsonse', save_final=True)

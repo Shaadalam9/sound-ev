@@ -184,8 +184,21 @@ The experiment captures and saves data for analysis in the `data` folder. The fo
      A separate CSV file is generated to store responses to the questions asked between trials.
 
 ## Collected data
-[![Keypress](figures/kp.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/kp.html)
+
+[![Gender](figures/gender.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/gender.html)
+Gender of the participants.
+
+[![Age](figures/age.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/age.html)
+Age distribution of participants.
+
+[![Keypress](figures/all_videos_kp_slider_plot_TriggerValueRight.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/all_videos_kp_slider_plot_TriggerValueRight.html)
 Mean keypress value.
+
+[![Keypress](figures/bar_repsonse.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/bar_repsonse.html)
+Mean Response.
+
+[![Yaw Angle](figures/all_videos_yaw_angle_Yaw.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/all_videos_yaw_angle_Yaw.html)
+Mean Yaw Angle.
 
 ## Contact
 If you have any questions or suggestions, feel free to reach out to md_shadab_alam@outlook.com or pavlo.bazilinskyy@gmail.com.
