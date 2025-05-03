@@ -1,7 +1,6 @@
 import pandas as pd
 import os
 import plotly.graph_objects as go
-import plotly.io as pio
 import plotly as py
 from plotly import subplots
 from plotly.subplots import make_subplots
@@ -13,10 +12,6 @@ from OneEuroFilter import OneEuroFilter
 import common
 from custom_logger import CustomLogger
 import re
-from PIL import Image
-import requests
-from io import BytesIO
-import base64
 import numpy as np
 from scipy.stats import ttest_rel, ttest_ind, f_oneway
 from scipy.spatial.transform import Rotation as R, Slerp
@@ -782,7 +777,7 @@ class HMD_helper:
         if save_file:
             self.save_plotly(fig=fig,
                              name=name_file,
-                             remove_margins=True,
+                             remove_margins=False,
                              width=fig_save_width,
                              height=fig_save_height,
                              save_final=save_final)  # also save as "final" figure
@@ -1307,6 +1302,8 @@ class HMD_helper:
             xaxis_step=3,
             yaxis_step=0.25,  # type: ignore
             line_width=3,
+            fig_save_width=1800,
+            fig_save_height=900,
             save_file=True,
             save_final=True
         )
@@ -1405,6 +1402,8 @@ class HMD_helper:
             legend_x=0.8,
             legend_y=0.2,
             line_width=3,
+            fig_save_width=1800,
+            fig_save_height=900,
             save_file=True,
             save_final=True
         )
