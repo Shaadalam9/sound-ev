@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 import plotly.io as pio
 import plotly as py
 from plotly import subplots
+from plotly.subplots import make_subplots
 import pycountry
 import math
 from collections import defaultdict
@@ -18,6 +19,7 @@ from io import BytesIO
 import base64
 import numpy as np
 from scipy.stats import ttest_rel, ttest_ind, f_oneway
+from scipy.spatial.transform import Rotation as R, Slerp
 from statsmodels.stats.anova import anova_lm
 from statsmodels.formula.api import ols
 import settings_dir as settings_dir
@@ -67,7 +69,84 @@ class HMD_helper:
         cosy_cosp = 1 - 2 * (y * y + z * z)
         yaw = math.atan2(siny_cosp, cosy_cosp)
 
+        # returns in radians
         return roll, pitch, yaw
+
+    def average_quaternions_slerp(self, quaternions):
+        """
+        Average a list of quaternions using incremental SLERP.
+
+        Args:
+            quaternions (List[List[float]]): List of [w, x, y, z] quaternions.
+
+        Returns:
+            np.ndarray: Averaged quaternion as [w, x, y, z]
+        """
+        if len(quaternions) == 0:
+            raise ValueError("No quaternions to average.")
+        elif len(quaternions) == 1:
+            return np.array(quaternions[0])
+
+        # Convert to scipy Rotation objects
+        rotations = R.from_quat([[q[1], q[2], q[3], q[0]] for q in quaternions])  # [x, y, z, w]
+
+        # Define time steps
+        times = np.linspace(0, 1, len(rotations))
+
+        # Interpolate over the entire path to the midpoint
+        slerp = Slerp(times, rotations)
+        avg_rot = slerp(0.5)
+
+        # Convert back to [w, x, y, z]
+        q = avg_rot.as_quat()  # type: ignore
+        return np.array([q[3], q[0], q[1], q[2]])
+
+    def compute_yaw_from_quaternions(self, data_folder, video_id, mapping, output_file):
+        """
+        Computes the average yaw angle per timestamp using quaternions for a given video_id.
+
+        Args:
+            data_folder (str): Base folder where participant CSVs are stored.
+            video_id (str): The video ID to process.
+            mapping (pd.DataFrame): Mapping file that includes video lengths.
+            output_file (str): Path to output CSV with average yaw angle.
+        """
+        grouped_data = self.group_files_by_video_id(data_folder, mapping)
+        files = grouped_data.get(video_id, [])
+
+        if not files:
+            logger.warning(f"No CSV files found for video_id={video_id}")
+            return
+
+        all_data = []
+
+        video_length_row = mapping.loc[mapping["video_id"] == video_id, "video_length"]
+        if video_length_row.empty:
+            logger.warning(f"Video length not found in mapping for video_id={video_id}")
+            return
+        video_length = video_length_row.values[0] / 1000  # Convert ms to seconds
+
+        for file_path in files:
+            df = pd.read_csv(file_path)
+            required_cols = {"Timestamp", "HMDRotationW", "HMDRotationX", "HMDRotationY", "HMDRotationZ"}
+            if not required_cols.issubset(df.columns):
+                continue
+
+            df = df[(df["Timestamp"] >= 0) & (df["Timestamp"] <= video_length + 0.01)]
+            df["Timestamp"] = ((df["Timestamp"] / 0.02).round() * 0.02).astype(float)
+
+            grouped = df.groupby("Timestamp")[["HMDRotationW", "HMDRotationX", "HMDRotationY", "HMDRotationZ"]].apply(
+                lambda group: self.quaternion_to_euler(*self.average_quaternions_slerp(group.values))[2]  # yaw
+            ).reset_index(name="Yaw")
+            all_data.append(grouped)
+
+        if not all_data:
+            logger.warning(f"No valid quaternion data for video_id={video_id}")
+            return
+
+        avg_df = pd.concat(all_data).groupby("Timestamp", as_index=False).mean()
+        avg_df.to_csv(output_file, index=False)
+        logger.info(f"Averaged yaw angle saved to: {output_file}")
 
     @staticmethod
     def get_flag_image_url(country_name):
@@ -109,7 +188,7 @@ class HMD_helper:
             type (str, optional): Type of t-test to perform. Options are "two-sided",
                                   "greater", or "less". Defaults to "two-sided".
             paired (bool, optional): Indicates whether to perform a paired t-test
-                                     (`ttest_rel`) or an independent t-test (`ttest_ind`).
+                                     (ttest_rel) or an independent t-test (ttest_ind).
                                      Defaults to True (paired).
 
         Returns:
@@ -117,7 +196,7 @@ class HMD_helper:
                   - p_values (list): Raw p-values for each bin.
                   - significance (list): Binary flags (0 or 1) indicating whether
                     the p-value for each bin is below the threshold configured in
-                    `tr.common.get_configs('p_value')`.
+                    tr.common.get_configs('p_value').
         """
         # Check if the lengths of the two signals are the same
         if len(signal_1) != len(signal_2):
@@ -166,7 +245,7 @@ class HMD_helper:
                   - p_values (list): Raw p-values for each bin.
                   - significance (list): Binary flags (0 or 1) indicating whether
                     the p-value for each bin is below the threshold configured in
-                    `tr.common.get_configs('p_value')`.
+                    tr.common.get_configs('p_value').
         """
         # check if the lengths of the three signals are the same
         # convert signals to numpy arrays if they are lists
@@ -634,7 +713,7 @@ class HMD_helper:
             anova_annotations_colour (str, optional): colour of annotations for ANOVA.
             ttest_anova_row_height (int, optional): height of row of ttest/anova markers.
             xaxis_step (int): step between ticks on x axis.
-            yaxis_step (int): step between ticks on y axis.
+            yaxis_step (float): step between ticks on y axis.
             y_legend_bar (list, optional): names for variables for bar data to be shown in the legend.
             line_width (int): width of the keypress line.
         """
@@ -642,24 +721,20 @@ class HMD_helper:
         # calculate times
         times = df['Timestamp'].values
         # plotly
-        fig = subplots.make_subplots(rows=2,
-                                     cols=2,
-                                     column_widths=[0.85, 0.15],
-                                     # subplot_titles=('Mean keypress values', 'Responses to sliders'),
-                                     specs=[[{"rowspan": 2}, {}],
-                                            [None, {}]],
-                                     horizontal_spacing=0.05,
-                                     # vertical_spacing=0.1,
+        fig = subplots.make_subplots(rows=1,
+                                     cols=1,
                                      shared_xaxes=False,
                                      shared_yaxes=False)
         # adjust ylim, if ttest results need to be plotted
         if ttest_signals:
             # assume one row takes ttest_anova_row_height on y axis
-            yaxis_kp_range[0] = round(yaxis_kp_range[0] - len(ttest_signals) * ttest_anova_row_height - ttest_anova_row_height)  # noqa: E501  # type: ignore
+            yaxis_kp_range[0] = (yaxis_kp_range[0] - len(ttest_signals) * ttest_anova_row_height - ttest_anova_row_height)  # noqa: E501  # type: ignore
+
         # adjust ylim, if anova results need to be plotted
         if anova_signals:
             # assume one row takes ttest_anova_row_height on y axis
-            yaxis_kp_range[0] = round(yaxis_kp_range[0] - len(anova_signals) * ttest_anova_row_height - ttest_anova_row_height)  # noqa: E501  # type: ignore
+            yaxis_kp_range[0] = (yaxis_kp_range[0] - len(anova_signals) * ttest_anova_row_height - ttest_anova_row_height)  # noqa: E501  # type: ignore
+
         # plot keypress data
         for row_number, key in enumerate(y):
             values = df[key]  # or whatever logic fits
@@ -673,17 +748,13 @@ class HMD_helper:
                 if isinstance(values, pd.Series):
                     values = values.tolist()
                     values = self.smoothen_filter(values)
-                # if not isinstance(values, (list, tuple, np.ndarray)):
-                #     values = [values]
-                # values = self.smoothen_filter(values)
+
             # plot signal
             fig.add_trace(go.Scatter(y=values,
                                      mode='lines',
                                      x=times,
                                      line=dict(width=line_width),
-                                     name=name),
-                          row=1,
-                          col=1)
+                                     name=name), row=1, col=1)
         # draw events
         self.draw_events(fig=fig,
                          yaxis_range=yaxis_kp_range,
@@ -700,6 +771,7 @@ class HMD_helper:
         else:
             fig.update_xaxes(title_text=xaxis_kp_title, range=xaxis_kp_range, row=1, col=1)
         fig.update_yaxes(title_text=yaxis_kp_title, showgrid=False, range=yaxis_kp_range, row=1, col=1)
+
         # prettify text
         if pretty_text:
             for variable in y:
@@ -709,6 +781,7 @@ class HMD_helper:
                     df[variable] = df[variable].str.replace('_', ' ')
                     # capitalise
                     df[variable] = df[variable].str.capitalize()
+
         # Plot slider data
         # use index of df if none is given
         if not x:
@@ -746,7 +819,7 @@ class HMD_helper:
         # update template
         fig.update_layout(template=self.template)
         # manually add grid lines for non-negative y values only
-        for y in range(0, yaxis_kp_range[1] + 1, yaxis_step):  # type: ignore
+        for y in np.arange(0, yaxis_kp_range[1] + 0.01, yaxis_step):  # type: ignore
             fig.add_shape(type="line",
                           x0=fig.layout.xaxis.range[0] if fig.layout.xaxis.range else 0,
                           x1=fig.layout.xaxis.range[1] if fig.layout.xaxis.range else 1,
@@ -816,130 +889,73 @@ class HMD_helper:
             anova_annotations_colour (str): colour of annotations for ANOVA.
             ttest_anova_row_height (int): height of row of ttest/anova markers.
         """
-        # count lines to calculate increase in coordinates of drawing
+        # Save original axis limits
+        original_min, original_max = yaxis_range
+        # Counters for marker rows
         counter_ttest = 0
-        # count lines to calculate increase in coordinates of drawing
         counter_anova = 0
-        # output ttest
+
+        # --- t-test markers ---
         if ttest_signals:
-            for signals in ttest_signals:
-                # receive significance values
-                [p_values, significance] = self.ttest(signal_1=signals['signal_1'],
-                                                      signal_2=signals['signal_2'],
-                                                      paired=signals['paired'])  # type: ignore
+            for comp in ttest_signals:
+                p_vals, sig = self.ttest(
+                    signal_1=comp['signal_1'], signal_2=comp['signal_2'], paired=comp['paired']
+                )  # type: ignore
+                # Save csv
+                times_csv = [round(i * 0.02, 2) for i in range(len(comp['signal_1']))]
+                self.save_stats_csv(t=times_csv, p_values=p_vals, name_file=f"{comp['label']}_{name_file}.csv")
+                if any(sig):
+                    xs, ys = [], []
+                    y_offset = original_min - ttest_anova_row_height * (counter_ttest + 1)
+                    for i, s in enumerate(sig):
+                        if s:
+                            xs.append(times[i]); ys.append(y_offset)
+                    # plot markers
+                    fig.add_trace(go.Scatter(x=xs, y=ys, mode='markers',
+                                             marker=dict(symbol=ttest_marker, size=ttest_marker_size,
+                                                         color=ttest_marker_colour),
+                                             text=p_vals, showlegend=False,
+                                             hovertemplate=f"{comp['label']}: time=%{{x}}, p=%{{text}}"))
+                    # label row
+                    fig.add_annotation(x=times[0] - (times[-1] - times[0]) * 0.0,
+                                       y=y_offset, text=comp['label'], xanchor='right', showarrow=False,
+                                       font=dict(size=ttest_annotations_font_size,
+                                                 color=ttest_annotations_colour))
+                    counter_ttest += 1
 
-                # save results to csv
-                time_step = 0.02  # or read from config if defined elsewhere
-                timestamps = [round(i * time_step, 2) for i in range(len(signals['signal_1']))]
-                self.save_stats_csv(t=timestamps,
-                                    p_values=p_values,
-                                    name_file=signals['label'] + '_' + name_file + '.csv')
-                # only proceed if there are significant results
-                if any(significance):  # Check if any significance is true (i.e., any stars)
-                    # add to the plot
-                    # plot stars based on random lists
-                    marker_x = []  # x-coordinates for stars
-                    marker_y = []  # y-coordinates for stars
-
-                    # assuming `times` and `signals['signal_1']` correspond to x and y data points
-                    for i in range(len(significance)):
-                        if significance[i] == 1:  # if value indicates a star
-                            marker_x.append(times[i])  # use the corresponding x-coordinate
-                            # dynamically set y-coordinate, offset by ttest_anova_row_height for each signal_index
-                            marker_y.append(-ttest_anova_row_height - counter_ttest * ttest_anova_row_height)
-
-                    # add scatter plot trace with cleaned data
-                    fig.add_trace(go.Scatter(x=marker_x,
-                                             y=marker_y,
-                                             # list of possible values: https://plotly.com/python/marker-style
-                                             mode='markers',
-                                             marker=dict(symbol=ttest_marker,  # marker
-                                                         size=ttest_marker_size,  # adjust size
-                                                         color=ttest_marker_colour),  # adjust colour
-                                             text=p_values,
-                                             showlegend=False,
-                                             hovertemplate=signals['label'] + ': time=%{x}, p_value=%{text}'),
-                                  row=1,
-                                  col=1)
-                    # add label with signals that are compared
-                    fig.add_annotation(text=signals['label'],
-                                       # put labels at the start of the x axis, as they are likely no significant
-                                       # effects in the start of the trial
-                                       x=0.2,
-                                       # draw in the negative range of y axis
-                                       y=-ttest_anova_row_height - counter_ttest * ttest_anova_row_height,
-                                       xanchor="left",  # aligns the left edge
-                                       showarrow=False,
-                                       font=dict(size=ttest_annotations_font_size, color=ttest_annotations_colour))
-                    # increase counter of lines drawn
-                    counter_ttest = counter_ttest + 1
-        # output ANOVA
+        # --- ANOVA markers ---
         if anova_signals:
-            # if ttest was plotted, take into account for y of the first row or marker
-            if counter_ttest > 0:
-                counter_anova = counter_ttest
-            # calculate for given signals one by one
-            for signals in anova_signals:
-                # receive significance values
-                [p_values, significance] = self.anova(signals)
-                # save results to csv
-                self.save_stats_csv(t=list(range(len(signals['signals'][0]))),
-                                    p_values=p_values,
-                                    name_file=signals['label'] + '_' + name_file + '.csv')
-                # only proceed if there are significant results
-                if any(significance):  # Check if any significance is true (i.e., any stars)
-                    # add to the plot
-                    marker_x = []  # x-coordinates for stars
-                    marker_y = []  # y-coordinates for stars
-                    # assuming `times` and `signals['signal_1']` correspond to x and y data points
-                    for i in range(len(significance)):
-                        if significance[i] == 1:  # if value indicates a star
-                            marker_x.append(times[i])  # use the corresponding x-coordinate
-                            # dynamically set y-coordinate, slightly offset for each signal_index
-                            marker_y.append(-ttest_anova_row_height - counter_anova * ttest_anova_row_height)
-                    # add scatter plot trace with cleaned data
-                    fig.add_trace(go.Scatter(x=marker_x,
-                                             y=marker_y,
-                                             # list of possible values: https://plotly.com/python/marker-style
-                                             mode='markers',
-                                             marker=dict(symbol=anova_marker,  # marker
-                                                         size=anova_marker_size,  # adjust size
-                                                         color=anova_marker_colour),  # adjust colour
-                                             text=p_values,
-                                             showlegend=False,
-                                             hovertemplate='time=%{x}, p_value=%{text}'),
-                                  row=1,
-                                  col=1)
-                    # add label with signals that are compared
-                    fig.add_annotation(text=signals['label'],
-                                       # put labels at the start of the x axis, as they are likely no significant
-                                       # effects in the start of the trial
-                                       x=0.2,
-                                       # draw in the negative range of y axis
-                                       y=-ttest_anova_row_height - counter_anova * ttest_anova_row_height,
-                                       xanchor="left",  # aligns the left edge
-                                       showarrow=False,
-                                       font=dict(size=anova_annotations_font_size, color=anova_annotations_colour))
-                # increase counter of lines drawn
-                counter_anova = counter_anova + 1
-        # hide ticks of negative values on y axis assuming that ticks are at step of 5
-        # calculate number of rows below x-axis (from t-test and anova)
-        n_rows = counter_ttest + (counter_anova - counter_ttest if counter_anova > 0 else 0)
+            counter_anova = counter_ttest
+            for comp in anova_signals:
+                p_vals, sig = self.anova(comp)
+                self.save_stats_csv(t=list(range(len(comp['signals'][0]))),
+                                    p_values=p_vals,
+                                    name_file=f"{comp['label']}_{name_file}.csv")
+                if any(sig):
+                    xs, ys = [], []
+                    y_offset = original_min - ttest_anova_row_height * (counter_anova + 1)
+                    for i, s in enumerate(sig):
+                        if s:
+                            xs.append(times[i]); ys.append(y_offset)
+                    fig.add_trace(go.Scatter(x=xs, y=ys, mode='markers',
+                                             marker=dict(symbol=anova_marker, size=anova_marker_size,
+                                                         color=anova_marker_colour),
+                                             text=p_vals, showlegend=False,
+                                             hovertemplate=f"{comp['label']}: time=%{{x}}, p=%{{text}}"))
+                    fig.add_annotation(x=times[0] - (times[-1] - times[0]) * 0.05,
+                                       y=y_offset, text=comp['label'], xanchor='right', showarrow=False,
+                                       font=dict(size=anova_annotations_font_size,
+                                                 color=anova_annotations_colour))
+                counter_anova += 1
 
-        # extend y-axis range downwards if needed
-        min_y = -ttest_anova_row_height * (n_rows + 1)
-        max_y = yaxis_range[1]
-
-        # generate new y-axis ticks from extended min_y to max_y, but hide the negative ones
-        r = range(0, int(max_y) + 1, yaxis_step)
-        tickvals = list(r)
-        ticktext = [str(t) if t >= 0 else '' for t in r]
-
-        # apply updated layout
+        # --- Adjust axis ---
+        n_rows = counter_ttest + max(0, counter_anova - counter_ttest)
+        min_y = original_min - ttest_anova_row_height * (n_rows + 1)
+        # Use dtick + tickformat for float ticks
         fig.update_layout(yaxis=dict(
-            range=[min_y, max_y],
-            tickvals=tickvals,
-            ticktext=ticktext
+            range=[min_y, original_max],
+            dtick=yaxis_step,
+            tickformat='.2f'
         ))
 
     def save_stats_csv(self, t, p_values, name_file):
@@ -1029,11 +1045,10 @@ class HMD_helper:
                 counter_lines = counter_lines + 1
 
     def avg_csv_files(self, data_folder, mapping):
-
         grouped_data = HMD_helper.group_files_by_video_id(data_folder, mapping)
 
         for video_id, file_locations in grouped_data.items():
-            combined_data = []
+            all_dfs = []
             video_length_row = mapping.loc[mapping["video_id"] == video_id, "video_length"]
             if video_length_row.empty:
                 logger.info(f"Video length not found for video_id: {video_id}")
@@ -1044,30 +1059,60 @@ class HMD_helper:
                 df = pd.read_csv(file_location)
 
                 # Filter the DataFrame to only include rows where Timestamp >= 0 and <= video_length
-                df = df[(df["Timestamp"] >= 0) & (df["Timestamp"] <= video_length)]
+                df = df[(df["Timestamp"] >= 0) & (df["Timestamp"] <= video_length + 0.01)]
 
                 # Round the Timestamp to the nearest multiple of 0.02
-                df["Timestamp"] = (df["Timestamp"] / 0.02).round() * 0.02
+                df["Timestamp"] = ((df["Timestamp"] / 0.02).round() * 0.02).astype(float)
 
-                combined_data.append(df)
+                all_dfs.append(df)
+
+            if not all_dfs:
+                continue
 
             # Concatenate all DataFrames row-wise
-            combined_df = pd.concat(combined_data, ignore_index=True)
+            combined_df = pd.concat(all_dfs, ignore_index=True)
 
-            # Group by 'Timestamp' and calculate the average for the column
-            avg_df = combined_df.groupby('Timestamp', as_index=False).mean()
+            # Group by 'Timestamp'
+            grouped = combined_df.groupby('Timestamp')
+
+            avg_rows = []
+            for timestamp, group in grouped:
+                row = {'Timestamp': timestamp}
+
+                # Quaternion SLERP averaging
+                if {"HMDRotationW", "HMDRotationX", "HMDRotationY", "HMDRotationZ"}.issubset(group.columns):
+                    quats = group[["HMDRotationW", "HMDRotationX", "HMDRotationY", "HMDRotationZ"]].values.tolist()
+                    avg_quat = self.average_quaternions_slerp(quats)
+                    row.update({
+                        "HMDRotationW": avg_quat[0],
+                        "HMDRotationX": avg_quat[1],
+                        "HMDRotationY": avg_quat[2],
+                        "HMDRotationZ": avg_quat[3],
+                    })
+
+                # Average all remaining columns (excluding Timestamp and quaternion cols)
+                other_cols = [col for col in group.columns if col not in ["Timestamp", "HMDRotationW",
+                                                                          "HMDRotationX", "HMDRotationY",
+                                                                          "HMDRotationZ"]]
+                for col in other_cols:
+                    row[col] = group[col].mean()
+
+                avg_rows.append(row)
+
+            avg_df = pd.DataFrame(avg_rows)
 
             # Save dataframe in the output folder
-            avg_df.to_csv(os.path.join(common.get_configs("output"), f"{video_id}_avg_df.csv"))
+            avg_df.to_csv(os.path.join(common.get_configs("output"), f"{video_id}_avg_df.csv"), index=False)
 
-    def export_participant_trigger_matrix(self, data_folder, video_id, output_file, mapping):
+    def export_participant_trigger_matrix(self, data_folder, video_id, output_file, column_name, mapping):
         """
-        Export a matrix of TriggerValueRight values per participant for a given video.
+        Export a matrix of column name values per participant for a given video.
 
         Args:
             data_folder (str): Path to folder containing participant data.
             video_id (str): Target video_id (e.g. '002', 'test', etc.).
             output_file (str): Path to output CSV file (e.g. '_output/participant_trigger_002.csv').
+            column_name (str): .
             mapping (DataFrame): The mapping DataFrame containing video length info.
         """
         participant_matrix = {}
@@ -1088,14 +1133,15 @@ class HMD_helper:
                     file_path = os.path.join(folder_path, file)
                     df = pd.read_csv(file_path)
 
-                    if "Timestamp" not in df or "TriggerValueRight" not in df:
+                    if "Timestamp" not in df or column_name not in df:
                         continue
 
                     # Round timestamps to 0.02s resolution
-                    df["Timestamp"] = (df["Timestamp"] / 0.02).round() * 0.02
+                    df["Timestamp"] = ((df["Timestamp"] / 0.02).round() * 0.02).astype(float)
+                    df["Timestamp"] = df["Timestamp"].round(2)
 
                     # Store trigger values
-                    participant_matrix[f"P{participant_id}"] = dict(zip(df["Timestamp"], df["TriggerValueRight"]))
+                    participant_matrix[f"P{participant_id}"] = dict(zip(df["Timestamp"], df[column_name]))
                     all_timestamps.update(df["Timestamp"])
                     break
 
@@ -1114,13 +1160,81 @@ class HMD_helper:
 
         # Build DataFrame
         combined_df = pd.DataFrame({"Timestamp": all_timestamps})
+
+        # ⚠️ Do NOT fill missing with 0 – preserve NaN for clarity
         for participant, values in participant_matrix.items():
-            combined_df[participant] = combined_df["Timestamp"].map(values).fillna(0)
+            combined_df[participant] = combined_df["Timestamp"].map(values)
 
         combined_df.to_csv(output_file, index=False)
         logger.info(f"Exported participant trigger matrix for video {video_id} to {output_file}")
 
-    def plot(self, mapping):
+    def export_participant_yaw_matrix(self, data_folder, video_id, output_file, mapping):
+        """
+        Export a matrix of yaw angles (computed from quaternions) per participant for a given video.
+
+        Args:
+            data_folder (str): Path to folder containing participant data.
+            video_id (str): Target video_id (e.g. '002', 'test', etc.).
+            output_file (str): Path to output CSV file (e.g. '_output/participant_yaw_002.csv').
+            mapping (DataFrame): The mapping DataFrame containing video length info.
+        """
+        participant_matrix = {}
+        all_timestamps = set()
+
+        for folder in sorted(os.listdir(data_folder)):
+            folder_path = os.path.join(data_folder, folder)
+            if not os.path.isdir(folder_path):
+                continue
+
+            match = re.match(r'Participant_(\d+)_', folder)
+            if not match:
+                continue
+            participant_id = int(match.group(1))
+
+            for file in os.listdir(folder_path):
+                if f"_{video_id}.csv" in file:
+                    file_path = os.path.join(folder_path, file)
+                    df = pd.read_csv(file_path)
+
+                    required_cols = {"Timestamp", "HMDRotationW", "HMDRotationX", "HMDRotationY", "HMDRotationZ"}
+                    if not required_cols.issubset(df.columns):
+                        continue
+
+                    # Normalize timestamps
+                    df["Timestamp"] = ((df["Timestamp"] / 0.02).round() * 0.02).astype(float)
+                    df["Timestamp"] = df["Timestamp"].round(2)
+
+                    # Group by timestamp and compute yaw
+                    yaw_by_time = df.groupby("Timestamp")[["HMDRotationW", "HMDRotationX", "HMDRotationY", "HMDRotationZ"]].apply(
+                        lambda group: self.quaternion_to_euler(*self.average_quaternions_slerp(group.values))[2]  # yaw
+                    ).reset_index(name="Yaw")
+
+                    participant_matrix[f"P{participant_id}"] = dict(zip(yaw_by_time["Timestamp"], yaw_by_time["Yaw"]))
+                    all_timestamps.update(yaw_by_time["Timestamp"])
+                    break
+
+        # Determine aligned timestamps using mapping
+        video_length_row = mapping.loc[mapping["video_id"] == video_id, "video_length"]
+        if not video_length_row.empty:
+            video_length_sec = video_length_row.values[0] / 1000  # convert ms to sec
+            all_timestamps = np.round(np.arange(0, video_length_sec + 0.02, 0.02), 2).tolist()
+
+            # Save timestamps
+            ts_output_path = output_file.replace(".csv", "_timestamps.csv")
+            pd.DataFrame({"Timestamp": all_timestamps}).to_csv(ts_output_path, index=False)
+            logger.info(f"Saved yaw timestamp range for video {video_id} to {ts_output_path}")
+        else:
+            logger.warning(f"Video length not found in mapping for video_id {video_id}")
+
+        # Build DataFrame
+        combined_df = pd.DataFrame({"Timestamp": all_timestamps})
+        for participant, values in participant_matrix.items():
+            combined_df[participant] = combined_df["Timestamp"].map(values)
+
+        combined_df.to_csv(output_file, index=False)
+        logger.info(f"Exported yaw participant matrix for video {video_id} to {output_file}")
+
+    def plot(self, mapping, column_name="TriggerValueRight"):
         """
         Generate a comparison plot of keypress data and subjective slider ratings
         across different video trials relative to a test condition.
@@ -1133,53 +1247,55 @@ class HMD_helper:
         Args:
             mapping (pd.DataFrame): A dataframe containing metadata about videos,
                                     including 'video_id' and 'sound_clip_name'.
+            column_name (str): The name of the column to extract for plotting
+                               (e.g., 'TriggerValueRight', 'TriggerValueLeft').
         """
         # Filter out the 'test' and 'est' video IDs from further processing
         video_id = mapping["video_id"]
         video_id = video_id[~video_id.isin(["test", "est"])]
 
-        all_dfs = []         # List to collect averaged keypress data per trial
-        all_labels = []      # List to store corresponding sound labels
-        ttest_signals = []   # List to hold signals for pairwise t-test analysis
+        all_dfs = []
+        all_labels = []
+        ttest_signals = []
 
-        data_folder = common.get_configs("data")  # Fetch path to data directory
+        data_folder = common.get_configs("data")
 
-        # --- Prepare TEST Data (used as baseline for comparison) ---
+        # Prepare test data
         self.export_participant_trigger_matrix(
             data_folder=data_folder,
             video_id="test",
-            output_file="_output/participant_trigger_test.csv",
+            output_file=f"_output/participant_{column_name}_test.csv",
+            column_name=column_name,
             mapping=mapping
         )
 
-        # Load the test participant keypress matrix
-        test_raw_df = pd.read_csv("_output/participant_trigger_test.csv")
+        test_raw_df = pd.read_csv(f"_output/participant_{column_name}_test.csv")
         test_matrix = test_raw_df.drop(columns=["Timestamp"]).values.tolist()
 
-        # --- Process Each Trial Video ---
+        # Process each trial
         for video in video_id:
             display_name = mapping.loc[mapping["video_id"] == video, "display_name"].values[0]
 
-            # Export and align participant keypress matrix for the current video
             self.export_participant_trigger_matrix(
                 data_folder=data_folder,
                 video_id=video,
-                output_file=f"_output/participant_trigger_{video}.csv",
+                output_file=f"_output/participant_{column_name}_{video}.csv",
+                column_name=column_name,
                 mapping=mapping
             )
 
-            # Load keypress matrix for current video
-            trial_raw_df = pd.read_csv(f"_output/participant_trigger_{video}.csv")
+            trial_raw_df = pd.read_csv(f"_output/participant_{column_name}_{video}.csv")
             trial_matrix = trial_raw_df.drop(columns=["Timestamp"]).values.tolist()
 
-            # Load averaged keypress signal over time
             df = pd.read_csv(f"_output/{video}_avg_df.csv")
 
-            # Append data and label for plotting
+            # Check if the column exists
+            if column_name not in df.columns:
+                raise ValueError(f"Column '{column_name}' not found in file: _output/{video}_avg_df.csv")
+
             all_dfs.append(df)
             all_labels.append(display_name)
 
-            # Store signals for statistical comparison with test condition
             ttest_signals.append({
                 "signal_1": test_matrix,
                 "signal_2": trial_matrix,
@@ -1187,24 +1303,205 @@ class HMD_helper:
                 "label": f"{display_name}"
             })
 
-        # --- Combine DataFrames for Plotting ---
+        # Combine DataFrames
         combined_df = pd.DataFrame()
-        combined_df["Timestamp"] = all_dfs[0]["Timestamp"]  # Assumes all trials share the same time index
+        combined_df["Timestamp"] = all_dfs[0]["Timestamp"]
 
         for df, label in zip(all_dfs, all_labels):
-            combined_df[label] = df["TriggerValueRight"]
+            combined_df[label] = df[column_name]
 
-        # --- Generate Plot ---
+        # Plotting
         self.plot_kp_slider_videos(
             df=combined_df,
             y=all_labels,
             y_legend_kp=all_labels,
-            yaxis_kp_range=[0, 1],
+            yaxis_kp_range=[0.45, 1],
             yaxis_slider_title="Slider rating (%)",
-            name_file="all_videos_kp_slider_plot",
+            name_file=f"all_videos_kp_slider_plot_{column_name}",
             show_text_labels=True,
             pretty_text=True,
             stacked=False,
             ttest_signals=ttest_signals,
-            ttest_anova_row_height=0.02
+            ttest_anova_row_height=0.03,
+            legend_x=0.78,
+            legend_y=1,
+            yaxis_step=0.25,
+            line_width=3,
+            save_file=True
         )
+
+    def plot_yaw(self, mapping, column_name="Yaw"):
+        """
+        Generate a comparison plot of keypress data and subjective slider ratings
+        across different video trials relative to a test condition.
+
+        This function processes participant trigger matrices for each trial,
+        aligns timestamps, attaches slider-based subjective ratings (annoyance,
+        informativeness, noticeability), and prepares data for visualization
+        including significance testing (t-tests) between the test condition and each trial.
+
+        Args:
+            mapping (pd.DataFrame): A dataframe containing metadata about videos,
+                                    including 'video_id' and 'sound_clip_name'.
+            column_name (str): The name of the column to extract for plotting
+                               (e.g., 'TriggerValueRight', 'TriggerValueLeft').
+        """
+        # Filter out the 'test' and 'est' video IDs from further processing
+        video_id = mapping["video_id"]
+        video_id = video_id[~video_id.isin(["test", "est"])]
+
+        all_dfs = []
+        all_labels = []
+        ttest_signals = []
+
+        data_folder = common.get_configs("data")
+
+        # Prepare test data
+        self.export_participant_yaw_matrix(
+            data_folder=data_folder,
+            video_id="test",
+            output_file=f"_output/participant_{column_name}_test.csv",
+            mapping=mapping
+        )
+
+        test_raw_df = pd.read_csv(f"_output/participant_{column_name}_test.csv")
+        test_matrix = test_raw_df.drop(columns=["Timestamp"]).values.tolist()
+
+        # Process each trial
+        for video in video_id:
+            display_name = mapping.loc[mapping["video_id"] == video, "display_name"].values[0]
+
+            self.export_participant_yaw_matrix(
+                data_folder=data_folder,
+                video_id=video,
+                output_file=f"_output/participant_{column_name}_{video}.csv",
+                mapping=mapping
+            )
+
+            trial_raw_df = pd.read_csv(f"_output/participant_{column_name}_{video}.csv")
+            trial_matrix = trial_raw_df.drop(columns=["Timestamp"]).values.tolist()
+
+            yaw_csv = f"_output/yaw_avg_{video}.csv"
+            self.compute_yaw_from_quaternions(data_folder, video, mapping, yaw_csv)
+            df = pd.read_csv(yaw_csv)
+
+            all_dfs.append(df)
+            all_labels.append(display_name)
+
+            ttest_signals.append({
+                "signal_1": test_matrix,
+                "signal_2": trial_matrix,
+                "paired": True,
+                "label": f"{display_name}"
+            })
+
+        # Combine DataFrames
+        combined_df = pd.DataFrame()
+        combined_df["Timestamp"] = all_dfs[0]["Timestamp"]
+
+        for df, label in zip(all_dfs, all_labels):
+            combined_df[label] = df[column_name]
+
+        # Plotting
+        self.plot_kp_slider_videos(
+            df=combined_df,
+            y=all_labels,
+            y_legend_kp=all_labels,
+            yaxis_kp_range=[0.05, 0.1],
+            yaxis_kp_title="Radian (∠)",
+            name_file=f"all_videos_yaw_angle_{column_name}",
+            show_text_labels=True,
+            pretty_text=True,
+            stacked=False,
+            ttest_signals=ttest_signals,
+            ttest_anova_row_height=0.01,
+            yaxis_step=0.03,
+            legend_x=0.8,
+            legend_y=0.2,
+            line_width=3,
+            save_file=True
+        )
+
+    def plot_individual_csvs_plotly(self, csv_paths, mapping_df):
+        """
+        Reads three CSV files, extracts the 'average' row, and creates 3 subplots
+        (bar charts), each showing 15 sound clip averages with standard deviation.
+
+        Parameters:
+            csv_paths (list of str): List of three file paths to CSVs.
+        """
+        if len(csv_paths) != 3:
+            raise ValueError("Please provide exactly three CSV file paths.")
+
+        # Load display name mapping
+        mapping_dict = dict(zip(mapping_df['sound_clip_name'], mapping_df['display_name']))
+
+        # Read dataframes and extract average and std rows
+        avgs, stds = [], []
+
+        for path in csv_paths:
+            df = pd.read_csv(path)
+            avg_row = df[df['participant_id'] == 'average']
+            if avg_row.empty:
+                raise ValueError(f"No 'average' row found in {path}")
+
+            numeric_df = df[df['participant_id'] != 'average'].drop(columns='participant_id').astype(float)
+            std_row = numeric_df.std()
+            avg_row = avg_row.drop(columns='participant_id').iloc[0].astype(float)
+
+            avgs.append(avg_row)
+            stds.append(std_row)
+
+        columns = avgs[0].index.tolist()
+        display_names = [mapping_dict.get(col, col) for col in columns]
+
+        # Create a 1x3 subplot layout (one subplot per CSV)
+        fig = make_subplots(rows=1, cols=3, subplot_titles=['Annoyance', 'Info', 'Noticeability'])
+
+        for i in range(3):
+            means = avgs[i]
+            deviations = stds[i]
+            max_val = max(means)
+            y_max = max_val + 1.5  # Add buffer for label visibility
+
+            fig.add_trace(
+                go.Bar(
+                    x=display_names,
+                    y=means,
+                    # text=[f"{m:.2f}<br>SD: {d:.2f}" for m, d in zip(means, deviations)],
+                    # texttemplate="%{text}",
+                    # textposition="outside",
+                    # textfont=dict(size=28),
+                    name=f'CSV{i+1}',
+                    showlegend=False
+                ),
+                row=1,
+                col=i+1
+            )
+
+            # Add rotated annotations (vertical labels)
+            for j, (x_val, y_val, m, d) in enumerate(zip(display_names, means, means, deviations)):
+                fig.add_annotation(
+                    text=f"{m:.2f} ({d:.2f})",
+                    x=x_val,
+                    y=y_val + 0.15,  # slightly above the bar
+                    showarrow=False,
+                    textangle=-90,  # rotate text vertically
+                    font=dict(size=12),
+                    xanchor='center',
+                    yanchor='bottom',
+                    row=1,
+                    col=i+1
+                )
+            fig.update_yaxes(range=[0, y_max], row=1, col=i+1)
+
+        fig.update_layout(
+            height=700,
+            width=1800,
+            margin=dict(t=80, b=120, l=40, r=40),
+            showlegend=False
+        )
+
+        fig.update_xaxes(tickangle=45)
+
+        fig.show()

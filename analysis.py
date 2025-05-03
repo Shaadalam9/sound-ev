@@ -35,4 +35,8 @@ if __name__ == "__main__":
     HMD.age_distribution(intake_questionnaire, output_folder)
     HMD.demographic_distribution(intake_questionnaire, output_folder)
     HMD.avg_csv_files(data_folder, mapping)
-    HMD.plot(mapping)
+    HMD.plot(mapping, column_name="TriggerValueRight")
+    HMD.plot_yaw(mapping)
+    HMD.plot_individual_csvs_plotly(["_output/slider_input_annoyance.csv",
+                                     "_output/slider_input_info.csv",
+                                     "_output/slider_input_noticeability.csv"], mapping)
