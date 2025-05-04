@@ -62,29 +62,29 @@ except Exception as e:
 # Execute analysis
 if __name__ == "__main__":
     logger.info("Analysis started.")
-    HMD.read_slider_data(data_folder,
-                         mapping,
-                         output_folder)
-    HMD.plot_column_distribution(intake_questionnaire,
-                                 intake_columns_to_plot,
-                                 output_folder="output",
-                                 save_file=True)
-    HMD.plot_column_distribution(post_experiment_questionnaire,
-                                 post_columns_to_plot,
-                                 output_folder="output",
-                                 save_file=True)
-    HMD.distribution_plots(intake_questionnaire,
-                           intake_columns_distribution_to_plot,
-                           output_folder="output",
-                           save_file=True)
-    HMD.distribution_plots(post_experiment_questionnaire,
-                           post_columns_distribution_to_plot,
-                           output_folder="output",
-                           save_file=True)
-    HMD.avg_csv_files(data_folder,
-                      mapping)
-    HMD.plot_column(mapping,
-                    column_name="TriggerValueRight")
+    # HMD.read_slider_data(data_folder,
+    #                      mapping,
+    #                      output_folder)
+    # HMD.plot_column_distribution(intake_questionnaire,
+    #                              intake_columns_to_plot,
+    #                              output_folder="output",
+    #                              save_file=True)
+    # HMD.plot_column_distribution(post_experiment_questionnaire,
+    #                              post_columns_to_plot,
+    #                              output_folder="output",
+    #                              save_file=True)
+    # HMD.distribution_plots(intake_questionnaire,
+    #                        intake_columns_distribution_to_plot,
+    #                        output_folder="output",
+    #                        save_file=True)
+    # HMD.distribution_plots(post_experiment_questionnaire,
+    #                        post_columns_distribution_to_plot,
+    #                        output_folder="output",
+    #                        save_file=True)
+    # HMD.avg_csv_files(data_folder,
+    #                   mapping)
+    # HMD.plot_column(mapping,
+    #                 column_name="TriggerValueRight")
     HMD.plot_yaw(mapping)
     HMD.plot_individual_csvs_plotly(["_output/slider_input_annoyance.csv",
                                      "_output/slider_input_info.csv",

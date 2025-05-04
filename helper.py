@@ -14,7 +14,6 @@ from custom_logger import CustomLogger
 import re
 import numpy as np
 from scipy.stats import ttest_rel, ttest_ind, f_oneway
-from scipy.spatial.transform import Rotation as R, Slerp
 from statsmodels.stats.anova import anova_lm
 from statsmodels.formula.api import ols
 
@@ -66,9 +65,9 @@ class HMD_helper:
         # returns in radians
         return roll, pitch, yaw
 
-    def average_quaternions_slerp(self, quaternions):
+    def average_quaternions_eigen(self, quaternions):
         """
-        Average a list of quaternions using incremental SLERP.
+        Average a list of quaternions using Markley's method (via eigen decomposition:https://doi.org/10.2514/1.28949).
 
         Args:
             quaternions (List[List[float]]): List of [w, x, y, z] quaternions.
@@ -81,19 +80,34 @@ class HMD_helper:
         elif len(quaternions) == 1:
             return np.array(quaternions[0])
 
-        # Convert to scipy Rotation objects
-        rotations = R.from_quat([[q[1], q[2], q[3], q[0]] for q in quaternions])  # [x, y, z, w]
+        # Convert to numpy array and ensure shape (N, 4)
+        q_arr = np.array(quaternions)
 
-        # Define time steps
-        times = np.linspace(0, 1, len(rotations))
+        # Normalize each quaternion to unit length
+        q_arr = np.array([q / np.linalg.norm(q) for q in q_arr])
 
-        # Interpolate over the entire path to the midpoint
-        slerp = Slerp(times, rotations)
-        avg_rot = slerp(0.5)
+        # Ensure quaternions are all in the same hemisphere
+        # Flip quaternions with negative dot product to the first
+        reference = q_arr[0]
+        for i in range(1, len(q_arr)):
+            if np.dot(reference, q_arr[i]) < 0:
+                q_arr[i] = -q_arr[i]
 
-        # Convert back to [w, x, y, z]
-        q = avg_rot.as_quat()  # type: ignore
-        return np.array([q[3], q[0], q[1], q[2]])
+        # Form the symmetric accumulator matrix
+        A = np.zeros((4, 4))
+        for q in q_arr:
+            q = q.reshape(4, 1)  # Make column vector
+            A += q @ q.T         # Outer product
+
+        # Normalize by number of quaternions (optional)
+        A /= len(q_arr)
+
+        # Eigen decomposition
+        eigenvalues, eigenvectors = np.linalg.eigh(A)
+        avg_q = eigenvectors[:, np.argmax(eigenvalues)]  # Pick eigenvector with largest eigenvalue
+
+        # Ensure scalar-first order: [w, x, y, z]
+        return avg_q if avg_q[0] >= 0 else -avg_q  # Normalise sign
 
     def compute_yaw_from_quaternions(self, data_folder, video_id, mapping, output_file):
         """
@@ -130,7 +144,7 @@ class HMD_helper:
             df["Timestamp"] = ((df["Timestamp"] / 0.02).round() * 0.02).astype(float)
 
             grouped = df.groupby("Timestamp")[["HMDRotationW", "HMDRotationX", "HMDRotationY", "HMDRotationZ"]].apply(
-                lambda group: self.quaternion_to_euler(*self.average_quaternions_slerp(group.values))[2]  # yaw
+                lambda group: self.quaternion_to_euler(*self.average_quaternions_eigen(group.values))[2]  # yaw
             ).reset_index(name="Yaw")
             all_data.append(grouped)
 
@@ -1066,7 +1080,7 @@ class HMD_helper:
                 # Perform SLERP-based quaternion averaging if quaternion columns are present
                 if {"HMDRotationW", "HMDRotationX", "HMDRotationY", "HMDRotationZ"}.issubset(group.columns):
                     quats = group[["HMDRotationW", "HMDRotationX", "HMDRotationY", "HMDRotationZ"]].values.tolist()
-                    avg_quat = self.average_quaternions_slerp(quats)
+                    avg_quat = self.average_quaternions_eigen(quats)
                     row.update({
                         "HMDRotationW": avg_quat[0],
                         "HMDRotationX": avg_quat[1],
@@ -1194,7 +1208,7 @@ class HMD_helper:
                                                            "HMDRotationX",
                                                            "HMDRotationY",
                                                            "HMDRotationZ"]].apply(
-                        lambda group: self.quaternion_to_euler(*self.average_quaternions_slerp(group.values))[2]  # yaw
+                        lambda group: self.quaternion_to_euler(*self.average_quaternions_eigen(group.values))[2]  # yaw
                     ).reset_index(name="Yaw")
 
                     participant_matrix[f"P{participant_id}"] = dict(zip(yaw_by_time["Timestamp"], yaw_by_time["Yaw"]))
