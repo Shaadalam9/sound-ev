@@ -24,12 +24,12 @@ intake_columns_to_plot = [
     "What is your primary mode of transportation?",
     "On average, how often did you drive a vehicle in the last 12 months?",
     "About how many kilometers (miles) did you drive in the last 12 months?",
-    "How many accidents were you involved in when driving a car in the last 3 years? (please include all accidents, regardless of how they were caused, how slight they were, or where they happened)",
-    "How often do you do the following?: Becoming angered by a particular type of driver, and indicate your hostility by whatever means you can.",
+    "How many accidents were you involved in when driving a car in the last 3 years? (please include all accidents, regardless of how they were caused, how slight they were, or where they happened)",  # noqa: E501
+    "How often do you do the following?: Becoming angered by a particular type of driver, and indicate your hostility by whatever means you can.",  # noqa: E501
     "How often do you do the following?: Disregarding the speed limit on a motorway.",
     "How often do you do the following?: Disregarding the speed limit on a residential road.",
-    "How often do you do the following?: Driving so close to the car in front that it would be difficult to stop in an emergency.",
-    "How often do you do the following?: Racing away from traffic lights with the intention of beating the driver next to you.",
+    "How often do you do the following?: Driving so close to the car in front that it would be difficult to stop in an emergency.",  # noqa: E501
+    "How often do you do the following?: Racing away from traffic lights with the intention of beating the driver next to you.",  # noqa: E501
     "How often do you do the following?: Sounding your horn to indicate your annoyance with another road user.",
     "How often do you do the following?: Using a mobile phone without a hands free kit."
 ]
