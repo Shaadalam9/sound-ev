@@ -349,7 +349,6 @@ class HMD_helper:
             ])
 
             fig.update_layout(
-                legend_title_text="Responses",
                 margin=dict(l=10, r=10, t=40, b=10)
             )
 
@@ -405,7 +404,6 @@ class HMD_helper:
             ])
 
             fig.update_layout(
-                legend_title_text=column_name,
                 margin=dict(l=10, r=10, t=40, b=10)
             )
 
