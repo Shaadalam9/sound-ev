@@ -191,6 +191,18 @@ Gender of the participants.
 [![Age](figures/age.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/age.html)
 Age distribution of participants.
 
+[![Hearing Aid](figures/are_you_wearing_any_seeing_aids_during_the_experiments.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/are_you_wearing_any_seeing_aids_during_the_experiments.html)
+Are you wearing any seeing aids during the experiments?
+
+[![License](figures/at_which_age_did_you_obtain_your_first_license_for_driving_a_car_or_motorcycle.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/at_which_age_did_you_obtain_your_first_license_for_driving_a_car_or_motorcycle.html)
+At which age did you obtain your first license for driving a car or motorcycle?
+
+[![Transportation](figures/what_is_your_primary_mode_of_transportation.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/what_is_your_primary_mode_of_transportation.html)
+What is your primary mode of transportation?
+
+[![driving](figures/about_how_many_kilometers_(miles)_did_you_drive_in_the_last_12_months.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/about_how_many_kilometers_(miles)_did_you_drive_in_the_last_12_months.html)
+"About how many kilometers (miles) did you drive in the last 12 months?"
+
 [![Keypress](figures/all_videos_kp_slider_plot_TriggerValueRight.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/all_videos_kp_slider_plot_TriggerValueRight.html)
 Mean keypress value.
 

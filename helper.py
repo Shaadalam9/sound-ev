@@ -316,84 +316,105 @@ class HMD_helper:
         result = df.loc[df["video_id"] == video_id_value, "sound_clip_name"]
         return result.iloc[0] if not result.empty else None
 
-    def gender_distribution(self, df, output_folder, save_file=True):
-        # Check if df is a string (file path), and read it as a DataFrame if necessary
-        if isinstance(df, str):
-            df = pd.read_csv(df)
-        # Count the occurrences of each gender
-        gender_counts = df.groupby('What is your gender?').size().reset_index(name='count')  # type: ignore
+    def plot_column_distribution(self, df, columns, output_folder, save_file=True):
+        """
+        Plots and prints distributions of specified survey columns.
 
-        # Drop any NaN values that may arise from invalid gender entries
-        gender_counts = gender_counts.dropna(subset=['What is your gender?'])
-
-        # Extract data for plotting
-        genders = gender_counts['What is your gender?'].tolist()
-        counts = gender_counts['count'].tolist()
-
-        # Create the pie chart
-        fig = go.Figure(data=[
-            go.Pie(labels=genders, values=counts, hole=0.0, marker=dict(colors=['red', 'blue', 'green']),
-                   showlegend=True)
-        ])
-
-        # Update layout
-        fig.update_layout(
-            legend_title_text="Gender"
-        )
-
-        # Save the figure in different formats
-        # save file to local output folder
-        if save_file:
-            # Final adjustments and display
-            fig.update_layout(margin=dict(l=10, r=10, t=10, b=10))
-            self.save_plotly(fig, 'gender', save_final=True)
-        # open it in localhost instead
-        else:
-            fig.show()
-
-    def age_distribution(self, df, output_folder, save_file=True):
-        # Check if df is a string (file path), and read it as a DataFrame if necessary
+        Parameters:
+            df (DataFrame or str): DataFrame or path to CSV.
+            columns (list): List of column names to analyze.
+            output_folder (str): Folder where plots will be saved.
+            save_file (bool): Whether to save plots or just show them.
+        """
         if isinstance(df, str):
             df = pd.read_csv(df)
 
-        # Count the occurrences of each age
-        age_counts = df.groupby('What is your age (in years)?').size().reset_index(name='count')  # type: ignore
+        for column in columns:
+            if column not in df.columns:
+                print(f"Column not found: {column}")
+                continue
 
-        # Convert the 'What is your age (in years)?' column to numeric (ignoring errors for non-numeric values)
-        age_counts['What is your age (in years)?'] = pd.to_numeric(age_counts['What is your age (in years)?'],
-                                                                   errors='coerce')
+            print(f"\n--- Distribution for: '{column}' ---")
+            # Drop missing
+            data = df[column].dropna().astype(str).str.strip()
+            value_counts = data.value_counts()
 
-        # Drop any NaN values that may arise from invalid age entries
-        age_counts = age_counts.dropna(subset=['What is your age (in years)?'])
+            # Print counts
+            for value, count in value_counts.items():
+                print(f"{value}: {count}")
 
-        # Sort the DataFrame by age in ascending order
-        age_counts = age_counts.sort_values(by='What is your age (in years)?')
+            # Create pie chart
+            fig = go.Figure(data=[
+                go.Pie(labels=value_counts.index, values=value_counts.values, hole=0.0)
+            ])
 
-        # Extract data for plotting
-        age = age_counts['What is your age (in years)?'].tolist()
-        counts = age_counts['count'].tolist()
+            fig.update_layout(
+                legend_title_text="Responses",
+                margin=dict(l=10, r=10, t=40, b=10)
+            )
 
-        # Add ' years' to each age label
-        age_labels = [f"{int(a)} years" for a in age]  # Convert age values back to integers
+            # Save or display
+            if save_file:
+                filename = column.replace(" ", "_").replace("?", "").lower()
+                self.save_plotly(fig, filename, save_final=True)
+            else:
+                fig.show()
 
-        # Create the pie chart
-        fig = go.Figure(data=[
-            go.Pie(labels=age_labels, values=counts, hole=0.0, showlegend=True, sort=False)
-        ])
+    def distribution_plots(self, df, column_names, output_folder, save_file=True):
 
-        # Update layout
-        fig.update_layout(
-            legend_title_text="Age"
-        )
+        if isinstance(df, str):
+            df = pd.read_csv(df)
 
-        # save file to local output folder
-        if save_file:
-            # Final adjustments and display
-            fig.update_layout(margin=dict(l=10, r=10, t=10, b=10))
-            self.save_plotly(fig, 'age', save_final=True)
-        # open it in localhost instead
-        else:
-            fig.show()
+        for column_name in column_names:
+            if column_name not in df.columns:
+                logger.warning(f"Column not found: {column_name}")
+                continue
+
+            # Try numeric conversion
+            temp_series = pd.to_numeric(df[column_name], errors='coerce')
+            is_numeric = pd.api.types.is_numeric_dtype(temp_series)
+
+            # Drop NaNs
+            df_clean = df.dropna(subset=[column_name]).copy()
+
+            if df_clean.empty:
+                logger.warning(f"No valid data in column: {column_name}")
+                continue
+
+            if is_numeric:
+                # Numeric column processing
+                df_clean[column_name] = pd.to_numeric(df_clean[column_name], errors='coerce')
+                mean_val = df_clean[column_name].mean()
+                std_val = df_clean[column_name].std()
+                logger.info(f"{column_name} - Mean: {mean_val:.2f}, Std Dev: {std_val:.2f}")
+
+                value_counts = df_clean[column_name].round().value_counts().sort_index()
+                labels = [f"{int(v)}" for v in value_counts.index]
+                values = value_counts.values
+            else:
+                # Categorical column processing
+                df_clean[column_name] = df_clean[column_name].astype(str).str.strip()
+                value_counts = df_clean[column_name].value_counts()
+                labels = value_counts.index.tolist()
+                values = value_counts.values.tolist()
+                logger.info(f"{column_name} - Response counts: {dict(zip(labels, values))}")
+
+            # Plotting
+            fig = go.Figure(data=[
+                go.Pie(labels=labels, values=values, hole=0.0, showlegend=True, sort=False)
+            ])
+
+            fig.update_layout(
+                legend_title_text=column_name,
+                margin=dict(l=10, r=10, t=40, b=10)
+            )
+
+            # Save or display
+            if save_file:
+                filename = column_name.replace(" ", "_").replace("?", "").lower()
+                self.save_plotly(fig, filename, save_final=True)
+            else:
+                fig.show()
 
     @staticmethod
     def read_slider_data(data_folder, mapping, output_folder):
@@ -1122,7 +1143,6 @@ class HMD_helper:
             # Save timestamps
             ts_output_path = output_file.replace(".csv", "_timestamps.csv")
             pd.DataFrame({"Timestamp": all_timestamps}).to_csv(ts_output_path, index=False)
-            logger.info(f"Saved timestamp range for video {video_id} to {ts_output_path}")
         else:
             logger.warning(f"Video length not found in mapping for video_id {video_id}")
 
@@ -1134,7 +1154,6 @@ class HMD_helper:
             combined_df[participant] = combined_df["Timestamp"].map(values)
 
         combined_df.to_csv(output_file, index=False)
-        logger.info(f"Exported participant trigger matrix for video {video_id} to {output_file}")
 
     def export_participant_yaw_matrix(self, data_folder, video_id, output_file, mapping):
         """
@@ -1193,7 +1212,6 @@ class HMD_helper:
             # Save timestamps
             ts_output_path = output_file.replace(".csv", "_timestamps.csv")
             pd.DataFrame({"Timestamp": all_timestamps}).to_csv(ts_output_path, index=False)
-            logger.info(f"Saved yaw timestamp range for video {video_id} to {ts_output_path}")
         else:
             logger.warning(f"Video length not found in mapping for video_id {video_id}")
 
@@ -1203,9 +1221,8 @@ class HMD_helper:
             combined_df[participant] = combined_df["Timestamp"].map(values)
 
         combined_df.to_csv(output_file, index=False)
-        logger.info(f"Exported yaw participant matrix for video {video_id} to {output_file}")
 
-    def plot(self, mapping, column_name="TriggerValueRight"):
+    def plot_column(self, mapping, column_name="TriggerValueRight"):
         """
         Generate a comparison plot of keypress data and subjective slider ratings
         across different video trials relative to a test condition.
