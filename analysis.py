@@ -85,7 +85,8 @@ if __name__ == "__main__":
     #                   mapping)
     # HMD.plot_column(mapping,
     #                 column_name="TriggerValueRight")
-    HMD.plot_yaw(mapping)
-    HMD.plot_individual_csvs_plotly(["_output/slider_input_annoyance.csv",
-                                     "_output/slider_input_info.csv",
-                                     "_output/slider_input_noticeability.csv"], mapping)
+    # HMD.plot_yaw(mapping)
+    # HMD.plot_individual_csvs_plotly(["_output/slider_input_annoyance.csv",
+    #                                  "_output/slider_input_info.csv",
+    #                                  "_output/slider_input_noticeability.csv"], mapping)
+    HMD.plot_yaw_angle_histograms(mapping, angle=15)

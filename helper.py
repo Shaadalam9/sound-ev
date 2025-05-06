@@ -1,5 +1,6 @@
 import pandas as pd
 import os
+import glob
 import plotly.graph_objects as go
 import plotly as py
 from plotly import subplots
@@ -327,7 +328,7 @@ class HMD_helper:
         return grouped_data
 
     def get_sound_clip_name(self, df, video_id_value):
-        result = df.loc[df["video_id"] == video_id_value, "sound_clip_name"]
+        result = df.loc[df["video_id"] == video_id_value, "display_name"]
         return result.iloc[0] if not result.empty else None
 
     def plot_column_distribution(self, df, columns, output_folder, save_file=True):
@@ -1515,3 +1516,66 @@ class HMD_helper:
 
         fig.update_xaxes(tickangle=45)
         self.save_plotly(fig, 'bar_repsonse', save_final=True)
+
+    def plot_yaw_angle_histograms(self, mapping, angle=180, data_folder='_output'):
+        """
+        Plots histogram of average yaw angles across participants for each trial.
+
+        Parameters:
+            - data_folder (str): Path to the folder containing CSV files named like 'participant_Yaw_trial_*.csv'
+        """
+
+        all_files = glob.glob(os.path.join(data_folder, 'participant_Yaw_trial_*'))
+        file_paths = sorted([
+            f for f in all_files
+            if re.match(r'.*participant_Yaw_trial_\d+\.csv$', os.path.basename(f))
+        ])
+
+        fig = go.Figure()
+
+        for file_path in file_paths:
+            df = pd.read_csv(file_path)
+
+            participant_cols = [col for col in df.columns if col.startswith('P')]
+            if not participant_cols:
+                continue
+
+            avg_yaw = df[participant_cols].mean(axis=1, skipna=True).dropna()
+            yaw_deg = np.degrees(avg_yaw)
+            filtered = yaw_deg[(yaw_deg >= -angle) & (yaw_deg <= angle)]
+            if len(filtered) == 0:
+                continue
+
+            hist, bins = np.histogram(filtered, bins=2*angle, range=(-angle, angle), density=True)
+            bin_centers = 0.5 * (bins[:-1] + bins[1:])
+
+            match = re.search(r"(trial_\d+)", file_path)
+
+            if match:
+                trial_info = match.group(1)
+
+            # Use custom display name if function is provided
+            display_name = self.get_sound_clip_name(df=mapping, video_id_value=trial_info)
+            fig.add_trace(go.Scatter(
+                x=bin_centers,
+                y=hist,
+                mode='lines',
+                name=display_name,
+                line=dict(width=2)
+            ))
+
+        fig.add_vline(x=0, line=dict(dash='dash', color='gray'), annotation_text="0°", annotation_position="top")
+
+        fig.update_layout(
+            xaxis_title='Average gaze yaw angle (deg)',
+            yaxis_title='Frequency',
+            xaxis=dict(tickmode='array',
+                       tickvals=[-angle, -(2*angle/3), -(angle/3), 0, (angle/3), ((2*angle/3)), 180]),
+            legend=dict(font=dict(size=20)),
+            width=1400,
+            height=800,
+            font=dict(size=16),
+            margin=dict(t=60, b=60, l=60, r=60)
+        )
+
+        self.save_plotly(fig, 'histogram', save_final=True)
