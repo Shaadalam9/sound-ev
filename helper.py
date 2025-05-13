@@ -5,9 +5,6 @@ import plotly.graph_objects as go
 import plotly as py
 from plotly import subplots
 from plotly.subplots import make_subplots
-import pycountry
-import math
-from collections import defaultdict
 # For OneEuroFilter, see https://github.com/casiez/OneEuroFilter
 from OneEuroFilter import OneEuroFilter
 import common
@@ -17,9 +14,12 @@ import numpy as np
 from scipy.stats import ttest_rel, ttest_ind, f_oneway
 from statsmodels.stats.anova import anova_lm
 from statsmodels.formula.api import ols
+from utils.HMD import HMD_yaw
 
 logger = CustomLogger(__name__)  # use custom logger
 template = common.get_configs("plotly_template")
+
+HMD_class = HMD_yaw()
 
 # Consts
 SAVE_PNG = True
@@ -35,138 +35,9 @@ class HMD_helper:
     smoothen_signal = common.get_configs('smoothen_signal')
     folder_figures = 'figures'  # subdirectory to save figures
     folder_stats = 'statistics'  # subdirectory to save statistical output
-    res = common.get_configs('kp_resolution')
 
     def __init__(self):
         pass
-
-    @staticmethod
-    def quaternion_to_euler(w, x, y, z):
-        """
-        Convert a quaternion into Euler angles (roll, pitch, yaw)
-        Roll is rotation around x-axis, pitch is rotation around y-axis, and yaw is rotation around z-axis.
-        """
-        # Roll (x-axis rotation)
-        sinr_cosp = 2 * (w * x + y * z)
-        cosr_cosp = 1 - 2 * (x * x + y * y)
-        roll = math.atan2(sinr_cosp, cosr_cosp)
-
-        # Pitch (y-axis rotation)
-        sinp = 2 * (w * y - z * x)
-        if abs(sinp) >= 1:
-            pitch = math.copysign(math.pi / 2, sinp)  # Use 90 degrees if out of range
-        else:
-            pitch = math.asin(sinp)
-
-        # Yaw (z-axis rotation)
-        siny_cosp = 2 * (w * z + x * y)
-        cosy_cosp = 1 - 2 * (y * y + z * z)
-        yaw = math.atan2(siny_cosp, cosy_cosp)
-
-        # returns in radians
-        return roll, pitch, yaw
-
-    def average_quaternions_eigen(self, quaternions):
-        """
-        Average a list of quaternions using Markley's method (via eigen decomposition:https://doi.org/10.2514/1.28949).
-
-        Args:
-            quaternions (List[List[float]]): List of [w, x, y, z] quaternions.
-
-        Returns:
-            np.ndarray: Averaged quaternion as [w, x, y, z]
-        """
-        if len(quaternions) == 0:
-            raise ValueError("No quaternions to average.")
-        elif len(quaternions) == 1:
-            return np.array(quaternions[0])
-
-        # Convert to numpy array and ensure shape (N, 4)
-        q_arr = np.array(quaternions)
-
-        # Normalize each quaternion to unit length
-        q_arr = np.array([q / np.linalg.norm(q) for q in q_arr])
-
-        # Ensure quaternions are all in the same hemisphere
-        # Flip quaternions with negative dot product to the first
-        reference = q_arr[0]
-        for i in range(1, len(q_arr)):
-            if np.dot(reference, q_arr[i]) < 0:
-                q_arr[i] = -q_arr[i]
-
-        # Form the symmetric accumulator matrix
-        A = np.zeros((4, 4))
-        for q in q_arr:
-            q = q.reshape(4, 1)  # Make column vector
-            A += q @ q.T         # Outer product
-
-        # Normalize by number of quaternions (optional)
-        A /= len(q_arr)
-
-        # Eigen decomposition
-        eigenvalues, eigenvectors = np.linalg.eigh(A)
-        avg_q = eigenvectors[:, np.argmax(eigenvalues)]  # Pick eigenvector with largest eigenvalue
-
-        # Ensure scalar-first order: [w, x, y, z]
-        return avg_q if avg_q[0] >= 0 else -avg_q  # Normalise sign
-
-    def compute_yaw_from_quaternions(self, data_folder, video_id, mapping, output_file):
-        """
-        Computes the average yaw angle per timestamp using quaternions for a given video_id.
-
-        Args:
-            data_folder (str): Base folder where participant CSVs are stored.
-            video_id (str): The video ID to process.
-            mapping (pd.DataFrame): Mapping file that includes video lengths.
-            output_file (str): Path to output CSV with average yaw angle.
-        """
-        grouped_data = self.group_files_by_video_id(data_folder, mapping)
-        files = grouped_data.get(video_id, [])
-
-        if not files:
-            logger.warning(f"No CSV files found for video_id={video_id}")
-            return
-
-        all_data = []
-
-        video_length_row = mapping.loc[mapping["video_id"] == video_id, "video_length"]
-        if video_length_row.empty:
-            logger.warning(f"Video length not found in mapping for video_id={video_id}")
-            return
-        video_length = video_length_row.values[0] / 1000  # Convert ms to seconds
-
-        for file_path in files:
-            df = pd.read_csv(file_path)
-            required_cols = {"Timestamp", "HMDRotationW", "HMDRotationX", "HMDRotationY", "HMDRotationZ"}
-            if not required_cols.issubset(df.columns):
-                continue
-
-            df = df[(df["Timestamp"] >= 0) & (df["Timestamp"] <= video_length + 0.01)]
-            df["Timestamp"] = ((df["Timestamp"] / 0.02).round() * 0.02).astype(float)
-
-            grouped = df.groupby("Timestamp")[["HMDRotationW", "HMDRotationX", "HMDRotationY", "HMDRotationZ"]].apply(
-                lambda group: self.quaternion_to_euler(*self.average_quaternions_eigen(group.values))[2]  # yaw
-            ).reset_index(name="Yaw")
-            all_data.append(grouped)
-
-        if not all_data:
-            logger.warning(f"No valid quaternion data for video_id={video_id}")
-            return
-
-        avg_df = pd.concat(all_data).groupby("Timestamp", as_index=False).mean()
-        avg_df.to_csv(output_file, index=False)
-        logger.info(f"Averaged yaw angle saved to: {output_file}")
-
-    @staticmethod
-    def get_flag_image_url(country_name):
-        """Fetches the flag image URL for a given country using ISO alpha-2 country codes."""
-        try:
-            # Convert country name to ISO alpha-2 country code
-            country = pycountry.countries.lookup(country_name)
-            # Use a flag API service that generates flags based on the country code
-            return f"https://flagcdn.com/w320/{country.alpha_2.lower()}.png"  # Example API from flagcdn.com
-        except LookupError:
-            return None  # Return None if country not found
 
     def smoothen_filter(self, signal, type_flter='OneEuroFilter'):
         """Smoothen list with a filter.
@@ -305,27 +176,6 @@ class HMD_helper:
         if output_console and label_str:
             logger.info('Results for two-way ANOVA for ' + label_str + ':\n', anova_results.to_string())
         return anova_results
-
-    @staticmethod
-    def group_files_by_video_id(data_folder, video_data):
-        # Read the main CSV to map video_id
-        video_ids = video_data['video_id'].unique()
-
-        grouped_data = defaultdict(list)
-
-        # Traverse through the data folder and its subfolders
-        for root, _, files in os.walk(data_folder):
-            for file in files:
-                if file.endswith('.csv'):
-                    # Extract the part of the filename after '_'
-                    file_parts = file.split('_', maxsplit=2)
-                    if len(file_parts) > 2:
-                        file_video_id = file_parts[-1].split('.')[0]  # Extract video_id
-                        if file_video_id in video_ids:
-                            full_path = os.path.join(root, file)
-                            grouped_data[file_video_id].append(full_path)
-
-        return grouped_data
 
     def get_sound_clip_name(self, df, video_id_value):
         result = df.loc[df["video_id"] == video_id_value, "display_name"]
@@ -1038,7 +888,7 @@ class HMD_helper:
         """
 
         # Group file paths by video_id using a helper function
-        grouped_data = HMD_helper.group_files_by_video_id(data_folder, mapping)
+        grouped_data = HMD_class.group_files_by_video_id(data_folder, mapping)
 
         # Process each video ID and its associated files
         for video_id, file_locations in grouped_data.items():
@@ -1081,7 +931,7 @@ class HMD_helper:
                 # Perform SLERP-based quaternion averaging if quaternion columns are present
                 if {"HMDRotationW", "HMDRotationX", "HMDRotationY", "HMDRotationZ"}.issubset(group.columns):
                     quats = group[["HMDRotationW", "HMDRotationX", "HMDRotationY", "HMDRotationZ"]].values.tolist()
-                    avg_quat = self.average_quaternions_eigen(quats)
+                    avg_quat = HMD_class.average_quaternions_eigen(quats)
                     row.update({
                         "HMDRotationW": avg_quat[0],
                         "HMDRotationX": avg_quat[1],
@@ -1162,7 +1012,7 @@ class HMD_helper:
         # Build DataFrame
         combined_df = pd.DataFrame({"Timestamp": all_timestamps})
 
-        # ⚠️ Do NOT fill missing with 0 – preserve NaN for clarity
+        # Do NOT fill missing with 0 – preserve NaN for clarity
         for participant, values in participant_matrix.items():
             combined_df[participant] = combined_df["Timestamp"].map(values)
 
@@ -1209,7 +1059,7 @@ class HMD_helper:
                                                            "HMDRotationX",
                                                            "HMDRotationY",
                                                            "HMDRotationZ"]].apply(
-                        lambda group: self.quaternion_to_euler(*self.average_quaternions_eigen(group.values))[2]  # yaw
+                        lambda group: HMD_class.quaternion_to_euler(*HMD_class.average_quaternions_eigen(group.values))[2]  # noqa: E501
                     ).reset_index(name="Yaw")
 
                     participant_matrix[f"P{participant_id}"] = dict(zip(yaw_by_time["Timestamp"], yaw_by_time["Yaw"]))
@@ -1390,7 +1240,7 @@ class HMD_helper:
             trial_matrix = trial_raw_df.drop(columns=["Timestamp"]).values.tolist()
 
             yaw_csv = f"_output/yaw_avg_{video}.csv"
-            self.compute_yaw_from_quaternions(data_folder, video, mapping, yaw_csv)
+            HMD_class.compute_yaw_from_quaternions(data_folder, video, mapping, yaw_csv)
             df = pd.read_csv(yaw_csv)
 
             all_dfs.append(df)
@@ -1517,12 +1367,16 @@ class HMD_helper:
         fig.update_xaxes(tickangle=45)
         self.save_plotly(fig, 'bar_repsonse', save_final=True)
 
-    def plot_yaw_angle_histograms(self, mapping, angle=180, data_folder='_output'):
+    def plot_yaw_angle_histograms(self, mapping, angle=180, data_folder='_output', num_bins=None,
+                                  smoothen_filter_param=False, calibrate=False):
         """
         Plots histogram of average yaw angles across participants for each trial.
 
         Parameters:
+            - mapping: DataFrame or data structure used to map trial identifiers to names
+            - angle (int): The range of yaw angles to consider (-angle to +angle)
             - data_folder (str): Path to the folder containing CSV files named like 'participant_Yaw_trial_*.csv'
+            - num_bins (int, optional): Number of bins to use in the histogram. Defaults to 2*angle.
         """
 
         all_files = glob.glob(os.path.join(data_folder, 'participant_Yaw_trial_*'))
@@ -1533,6 +1387,9 @@ class HMD_helper:
 
         fig = go.Figure()
 
+        if num_bins is None:
+            num_bins = 2 * angle
+
         for file_path in file_paths:
             df = pd.read_csv(file_path)
 
@@ -1541,12 +1398,24 @@ class HMD_helper:
                 continue
 
             avg_yaw = df[participant_cols].mean(axis=1, skipna=True).dropna()
-            yaw_deg = np.degrees(avg_yaw)
+
+            if calibrate:
+                calibrated_yaw = avg_yaw - avg_yaw.iloc[0]
+                yaw_deg = np.degrees(calibrated_yaw)
+
+            else:
+                yaw_deg = np.degrees(avg_yaw)
+
+            # Apply smoothing
+            if smoothen_filter_param:
+                yaw_deg = self.smoothen_filter(yaw_deg.tolist(), type_flter='OneEuroFilter')
+                yaw_deg = np.array(yaw_deg)
+
             filtered = yaw_deg[(yaw_deg >= -angle) & (yaw_deg <= angle)]
             if len(filtered) == 0:
                 continue
 
-            hist, bins = np.histogram(filtered, bins=2*angle, range=(-angle, angle), density=True)
+            hist, bins = np.histogram(filtered, bins=num_bins, range=(-angle, angle), density=True)
             bin_centers = 0.5 * (bins[:-1] + bins[1:])
 
             match = re.search(r"(trial_\d+)", file_path)
