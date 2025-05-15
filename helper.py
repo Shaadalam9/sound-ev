@@ -1105,7 +1105,8 @@ class HMD_helper:
         """
         # Filter out the 'test' and 'est' video IDs from further processing
         video_id = mapping["video_id"]
-        plot_videos = video_id[~video_id.isin(["est"])]
+        plot_videos = video_id[~video_id.isin(["test", "est"])]
+        color_dict = dict(zip(mapping['display_name'], mapping['colour']))
 
         all_dfs = []
         all_labels = []
@@ -1116,13 +1117,13 @@ class HMD_helper:
         # Prepare test data
         self.export_participant_trigger_matrix(
             data_folder=data_folder,
-            video_id="test",
-            output_file=f"_output/participant_{column_name}_test.csv",
+            video_id="trial_6",
+            output_file=f"_output/participant_{column_name}_trial_6.csv",
             column_name=column_name,
             mapping=mapping
         )
 
-        test_raw_df = pd.read_csv(f"_output/participant_{column_name}_test.csv")
+        test_raw_df = pd.read_csv(f"_output/participant_{column_name}_trial_6.csv")
         test_matrix = test_raw_df.drop(columns=["Timestamp"]).values.tolist()
 
         # Process each video (including 'test')
@@ -1187,7 +1188,8 @@ class HMD_helper:
             fig_save_width=1800,
             fig_save_height=900,
             save_file=True,
-            save_final=True
+            save_final=True,
+            custom_line_colors=[color_dict.get(label, None) for label in all_labels]
         )
 
     def plot_yaw(self, mapping, column_name="Yaw"):
