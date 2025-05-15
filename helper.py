@@ -422,7 +422,8 @@ class HMD_helper:
                               ttest_annotations_colour='black', anova_signals=None, anova_marker='cross',
                               anova_marker_size=3, anova_marker_colour='black', anova_annotations_font_size=10,
                               anova_annotations_colour='black', ttest_anova_row_height=0.5, xaxis_step=5,
-                              yaxis_step=5, y_legend_bar=None, line_width=1, bar_font_size=None):
+                              yaxis_step=5, y_legend_bar=None, line_width=1, bar_font_size=None,
+                              custom_line_colors=None):
         """
         Plot keypresses with multiple variables as a filter and slider questions for the stimuli.
 
@@ -523,7 +524,8 @@ class HMD_helper:
             fig.add_trace(go.Scatter(y=values,
                                      mode='lines',
                                      x=times,
-                                     line=dict(width=line_width),
+                                     line=dict(width=line_width,
+                                               color=custom_line_colors[row_number] if custom_line_colors else None),
                                      name=name), row=1, col=1)
 
         # draw events
@@ -1001,7 +1003,7 @@ class HMD_helper:
         video_length_row = mapping.loc[mapping["video_id"] == video_id, "video_length"]
         if not video_length_row.empty:
             video_length_sec = video_length_row.values[0] / 1000  # convert ms to sec
-            all_timestamps = np.round(np.arange(0, video_length_sec + 0.02, 0.02), 2).tolist()
+            all_timestamps = np.round(np.arange(0.02, video_length_sec + 0.02, 0.02), 2).tolist()
 
             # Save timestamps
             ts_output_path = output_file.replace(".csv", "_timestamps.csv")
@@ -1070,7 +1072,7 @@ class HMD_helper:
         video_length_row = mapping.loc[mapping["video_id"] == video_id, "video_length"]
         if not video_length_row.empty:
             video_length_sec = video_length_row.values[0] / 1000  # convert ms to sec
-            all_timestamps = np.round(np.arange(0, video_length_sec + 0.02, 0.02), 2).tolist()
+            all_timestamps = np.round(np.arange(0.02, video_length_sec + 0.02, 0.02), 2).tolist()
 
             # Save timestamps
             ts_output_path = output_file.replace(".csv", "_timestamps.csv")
@@ -1206,7 +1208,8 @@ class HMD_helper:
         """
         # Filter out the 'test' and 'est' video IDs from further processing
         video_id = mapping["video_id"]
-        plot_videos = video_id[~video_id.isin(["est"])]
+        plot_videos = video_id[~video_id.isin(["test", "est"])]
+        color_dict = dict(zip(mapping['display_name'], mapping['colour']))
 
         all_dfs = []
         all_labels = []
@@ -1217,12 +1220,12 @@ class HMD_helper:
         # Prepare test data
         self.export_participant_yaw_matrix(
             data_folder=data_folder,
-            video_id="test",
-            output_file=f"_output/participant_{column_name}_test.csv",
+            video_id="trial_6",
+            output_file=f"_output/participant_{column_name}_trial_6.csv",
             mapping=mapping
         )
 
-        test_raw_df = pd.read_csv(f"_output/participant_{column_name}_test.csv")
+        test_raw_df = pd.read_csv(f"_output/participant_{column_name}_trial_6.csv")
         test_matrix = test_raw_df.drop(columns=["Timestamp"]).values.tolist()
 
         # Process each trial (including 'test' for plotting)
@@ -1279,13 +1282,14 @@ class HMD_helper:
             ttest_anova_row_height=0.01,
             xaxis_step=3,
             yaxis_step=0.03,  # type: ignore
-            legend_x=0.8,
+            legend_x=0.1,
             legend_y=0.2,
             line_width=3,
             fig_save_width=1800,
             fig_save_height=900,
             save_file=True,
-            save_final=True
+            save_final=True,
+            custom_line_colors=[color_dict.get(label, None) for label in all_labels]
         )
 
     def plot_individual_csvs_plotly(self, csv_paths, mapping_df):
