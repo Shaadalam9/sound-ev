@@ -15,6 +15,8 @@ from scipy.stats import ttest_rel, ttest_ind, f_oneway
 from statsmodels.stats.anova import anova_lm
 from statsmodels.formula.api import ols
 from utils.HMD import HMD_yaw
+from tqdm import tqdm
+
 
 logger = CustomLogger(__name__)  # use custom logger
 template = common.get_configs("plotly_template")
@@ -196,10 +198,10 @@ class HMD_helper:
 
         for column in columns:
             if column not in df.columns:
-                print(f"Column not found: {column}")
+                logger.error(f"Column not found: {column}")
                 continue
 
-            print(f"\n--- Distribution for: '{column}' ---")
+            logger.info(f"Distribution for: '{column}'")
             # Drop missing
             data = df[column].dropna().astype(str).str.strip()
             value_counts = data.value_counts()
@@ -893,7 +895,8 @@ class HMD_helper:
         grouped_data = HMD_class.group_files_by_video_id(data_folder, mapping)
 
         # Process each video ID and its associated files
-        for video_id, file_locations in grouped_data.items():
+        logger.info("Exporting CSV files.")
+        for video_id, file_locations in tqdm(grouped_data.items()):
             all_dfs = []
 
             # Retrieve the video length from the mapping DataFrame
