@@ -14,6 +14,7 @@ import numpy as np
 from scipy.stats import ttest_rel, ttest_ind, f_oneway
 from statsmodels.stats.anova import anova_lm
 from statsmodels.formula.api import ols
+from scipy.stats import zscore
 from utils.HMD import HMD_yaw
 from tqdm import tqdm
 
@@ -645,8 +646,13 @@ class HMD_helper:
         # stacked bar chart
         if stacked:
             fig.update_layout(barmode='stack')
+
         # legend
-        fig.update_layout(legend=dict(x=legend_x, y=legend_y, bgcolor='rgba(0,0,0,0)'))
+        fig.update_layout(legend=dict(x=legend_x,
+                                      y=legend_y,
+                                      bgcolor='rgba(0,0,0,0)',
+                                      font=dict(size=13)))
+
         # update font family
         if font_family:
             # use given value
@@ -829,7 +835,7 @@ class HMD_helper:
                 # draw start
                 fig.add_shape(type='line',
                               x0=event['start'],
-                              y0=0,
+                              y0=yaxis_range[0],
                               x1=event['start'],
                               y1=yaxis_range[1],
                               line=dict(color=events_colour,
@@ -840,7 +846,7 @@ class HMD_helper:
                     # draw finish
                     fig.add_shape(type='line',
                                   x0=event['end'],
-                                  y0=0,
+                                  y0=yaxis_range[0],
                                   x1=event['end'],
                                   y1=yaxis_range[1],
                                   line=dict(color=events_colour,
@@ -869,8 +875,9 @@ class HMD_helper:
                 # just draw text label
                 else:
                     fig.add_annotation(text=event['annotation'],
-                                       x=event['start'] + 1.1,
-                                       y=yaxis_range[1] - counter_lines * 2 - 0.2,  # use ylim value and draw lower
+                                       x=event['start'] + 0.0,
+                                       y=yaxis_range[1],
+                                       # y=yaxis_range[1] - counter_lines * 2 - 0.2,  # use ylim value and draw lower
                                        showarrow=False,
                                        font=dict(size=events_annotations_font_size, color=events_annotations_colour))
                 # increase counter of lines drawn
@@ -1168,6 +1175,12 @@ class HMD_helper:
         for df, label in zip(all_dfs, all_labels):
             combined_df[label] = df[column_name]
 
+        events = []
+        events.append({'id': 1,
+                       'start': 8.7,  # type: ignore
+                       'end': 8.7,  # type: ignore
+                       'annotation': 'Overtake'})
+
         # Plotting
         self.plot_kp_slider_videos(
             df=combined_df,
@@ -1177,17 +1190,21 @@ class HMD_helper:
             yaxis_slider_title="Slider rating (%)",
             xaxis_kp_title_offset=-0.035,  # type: ignore
             yaxis_kp_title_offset=0.18,  # type: ignore
+            yaxis_kp_title="Trigger pressure level",
             name_file=f"all_videos_kp_slider_plot_{column_name}",
             show_text_labels=True,
             pretty_text=True,
+            events=events,
+            events_annotations_font_size=12,
             stacked=False,
             ttest_signals=ttest_signals,
             ttest_anova_row_height=0.03,
-            legend_x=0.78,
-            legend_y=1,
+            legend_x=0.3,
+            legend_y=0.8,
             xaxis_step=3,
             yaxis_step=0.25,  # type: ignore
             line_width=3,
+            font_size=18,
             fig_save_width=1800,
             fig_save_height=900,
             save_file=True,
@@ -1267,6 +1284,12 @@ class HMD_helper:
         combined_df = pd.DataFrame()
         combined_df["Timestamp"] = all_dfs[0]["Timestamp"]
 
+        events = []
+        events.append({'id': 1,
+                       'start': 8.7,  # type: ignore
+                       'end': 8.7,  # type: ignore
+                       'annotation': 'Overtake'})
+
         for df, label in zip(all_dfs, all_labels):
             combined_df[label] = df[column_name]
 
@@ -1277,24 +1300,27 @@ class HMD_helper:
             y_legend_kp=all_labels,
             yaxis_kp_range=[0.03, 0.1],
             yaxis_kp_title="Radian",
-            xaxis_kp_title_offset=-0.035,  # type: ignore
-            yaxis_kp_title_offset=0.22,  # type: ignore
+            xaxis_kp_title_offset=-0.04,  # type: ignore
+            yaxis_kp_title_offset=0.17,  # type: ignore
             name_file=f"all_videos_yaw_angle_{column_name}",
             show_text_labels=True,
             pretty_text=True,
+            events=events,
+            events_annotations_font_size=12,
             stacked=False,
             ttest_signals=ttest_signals,
             ttest_anova_row_height=0.01,
-            xaxis_step=3,
+            xaxis_step=2,
             yaxis_step=0.03,  # type: ignore
             legend_x=0.1,
-            legend_y=0.2,
+            legend_y=0.225,
             line_width=3,
             fig_save_width=1800,
             fig_save_height=900,
+            font_size=18,
             save_file=True,
             save_final=True,
-            custom_line_colors=[color_dict.get(label, None) for label in all_labels]
+            custom_line_colors=[color_dict.get(label, None) for label in all_labels],
         )
 
     def plot_individual_csvs_plotly(self, csv_paths, mapping_df):
@@ -1311,7 +1337,6 @@ class HMD_helper:
         # Load display name mapping
         mapping_dict = dict(zip(mapping_df['sound_clip_name'], mapping_df['display_name']))
 
-        # Read dataframes and extract average and std rows
         avgs, stds = [], []
 
         for path in csv_paths:
@@ -1330,51 +1355,73 @@ class HMD_helper:
         columns = avgs[0].index.tolist()
         display_names = [mapping_dict.get(col, col) for col in columns]
 
-        # Create a 1x3 subplot layout (one subplot per CSV)
-        fig = make_subplots(rows=1, cols=3, subplot_titles=['Annoyance', 'Info', 'Noticeability'])
+        # Compute Composite Score (z-score normalized average with inverted Annoyance)
+        annoyance = avgs[0]
+        info = avgs[1]
+        notice = avgs[2]
 
-        for i in range(3):
-            means = avgs[i]
-            deviations = stds[i]
-            max_val = max(means)
-            y_max = max_val + 1.5  # Add buffer for label visibility
+        max_scale = 10  # Assumed rating scale
+        non_annoyance = max_scale - annoyance
+
+        z_annoyance = zscore(non_annoyance)
+        z_info = zscore(info)
+        z_notice = zscore(notice)
+
+        composite = (z_annoyance + z_info + z_notice) / 3
+        composite_std = ((stds[0] + stds[1] + stds[2]) / 3).fillna(0)  # Optional, just for label
+
+        # subplot_titles = ['Annoyance', 'Info', 'Noticeability', 'Composite Score']
+        # fig = make_subplots(rows=2, cols=2, subplot_titles=subplot_titles)
+        fig = make_subplots(rows=2, cols=2, vertical_spacing=0.20)
+
+        data_to_plot = [
+            (avgs[0], stds[0]),
+            (avgs[1], stds[1]),
+            (avgs[2], stds[2]),
+            (composite, composite_std)
+        ]
+
+        for i, (means, deviations) in enumerate(data_to_plot):
+            row = (i // 2) + 1
+            col = (i % 2) + 1
+            # Set y-axis range: fixed to 10 for first 3 plots, dynamic for composite
+            y_max = 13 if i < 3 else max(means) + 1.5
 
             fig.add_trace(
                 go.Bar(
                     x=display_names,
                     y=means,
-                    name=f'CSV{i+1}',
+                    # name=subplot_titles[i],
                     showlegend=False
                 ),
-                row=1,
-                col=i+1
+                row=row,
+                col=col
             )
 
-            # Add rotated annotations (vertical labels)
-            for j, (x_val, y_val, m, d) in enumerate(zip(display_names, means, means, deviations)):
+            for x_val, y_val, m, d in zip(display_names, means, means, deviations):
                 fig.add_annotation(
                     text=f"{m:.2f} ({d:.2f})",
                     x=x_val,
-                    y=y_val + 0.15,  # slightly above the bar
+                    y=y_val + 0.15,
                     showarrow=False,
-                    textangle=-90,  # rotate text vertically
+                    textangle=-90,
                     font=dict(size=12),
                     xanchor='center',
                     yanchor='bottom',
-                    row=1,
-                    col=i+1
+                    row=row,
+                    col=col
                 )
-            fig.update_yaxes(range=[0, y_max], row=1, col=i+1)
+            fig.update_yaxes(range=[0, y_max], row=row, col=col)
 
         fig.update_layout(
-            height=700,
-            width=1800,
+            height=900,
+            width=1600,
             margin=dict(t=80, b=120, l=40, r=40),
             showlegend=False
         )
 
         fig.update_xaxes(tickangle=45)
-        self.save_plotly(fig, 'bar_repsonse', save_final=True)
+        self.save_plotly(fig, 'bar_response', save_final=True)
 
     def plot_yaw_angle_histograms(self, mapping, angle=180, data_folder='_output', num_bins=None,
                                   smoothen_filter_param=False, calibrate=False):
