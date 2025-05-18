@@ -3,6 +3,7 @@ import os
 import glob
 import plotly.graph_objects as go
 import plotly as py
+import plotly.io as pio
 from plotly.subplots import make_subplots
 # For OneEuroFilter, see https://github.com/casiez/OneEuroFilter
 from OneEuroFilter import OneEuroFilter
@@ -362,6 +363,8 @@ class HMD_helper:
             save_mp4 (bool, optional): save video as MP4 file.
             save_final (bool, optional): whether to save the "good" final figure.
         """
+        # disable mathjax globally for Kaleido
+        pio.kaleido.scope.mathjax = None
         # build path
         path = os.path.join(common.get_configs("output"), self.folder_figures)
         if not os.path.exists(path):
@@ -414,7 +417,7 @@ class HMD_helper:
                 xaxis_range=None, yaxis_range=None, stacked=False,
                 pretty_text=False, orientation='v', show_text_labels=False,
                 name_file='kp', save_file=False, save_final=False,
-                fig_save_width=1320, fig_save_height=680, legend_x=0.7, legend_y=0.95,
+                fig_save_width=1320, fig_save_height=680, legend_x=0.7, legend_y=0.95, legend_columns=1,
                 font_family=None, font_size=None, ttest_signals=None, ttest_marker='circle',
                 ttest_marker_size=3, ttest_marker_colour='black', ttest_annotations_font_size=10,
                 ttest_annotation_x=0, ttest_annotations_colour='black', anova_signals=None, anova_marker='cross',
@@ -453,6 +456,7 @@ class HMD_helper:
             fig_save_height (int, optional): Height of the figure when saving.
             legend_x (float, optional): X location of legend as percentage of plot width.
             legend_y (float, optional): Y location of legend as percentage of plot height.
+            legend_columns (int, optional): Number of columns in legend
             font_family (str, optional): Font family to use in the figure.
             font_size (int, optional): Font size to use in the figure.
             ttest_signals (list, optional): Signals to compare using t-test.
@@ -569,7 +573,7 @@ class HMD_helper:
             xref='paper',
             yref='paper',
             x=xaxis_title_offset,     # still left side
-            y=0.5 + yaxis_title_offset,  # ⬅️ push label higher (was 0.5 + offset)
+            y=0.5 + yaxis_title_offset,  # push label higher (was 0.5 + offset)
             showarrow=False,
             textangle=-90,
             font=dict(size=font_size or common.get_configs('font_size')),
@@ -634,10 +638,29 @@ class HMD_helper:
             fig.update_layout(barmode='stack')
 
         # legend
-        fig.update_layout(legend=dict(x=legend_x,
-                                      y=legend_y,
-                                      bgcolor='rgba(0,0,0,0)',
-                                      font=dict(size=font_size)))
+        if legend_columns == 1:
+            fig.update_layout(legend=dict(x=legend_x,
+                                          y=legend_y,
+                                          bgcolor='rgba(0,0,0,0)',
+                                          font=dict(size=font_size)))
+        elif legend_columns == 2:
+            fig.update_layout(
+                legend=dict(
+                    x=legend_x,
+                    y=legend_y,
+                    bgcolor='rgba(0,0,0,0)',
+                    font=dict(size=font_size or common.get_configs('font_size')),
+                    orientation='h',  # must be vertical
+                    traceorder='normal',
+                    itemwidth=30,  # fixed item width to ensure consistent wrapping
+                    itemsizing='constant'
+                ),
+                legend_title_text='',
+                legend_tracegroupgap=5,
+                legend_groupclick='toggleitem',
+                legend_itemclick='toggleothers',
+                legend_itemdoubleclick='toggle',
+            )
 
         # update font family
         if font_family:
@@ -657,7 +680,7 @@ class HMD_helper:
         if save_file:
             self.save_plotly(fig=fig,
                              name=name_file,
-                             remove_margins=False,
+                             remove_margins=True,
                              width=fig_save_width,
                              height=fig_save_height,
                              save_final=save_final)  # also save as "final" figure
@@ -1191,12 +1214,13 @@ class HMD_helper:
             ttest_anova_row_height=0.03,
             ttest_annotations_font_size=13,
             ttest_annotation_x=1.2,  # type: ignore
-            legend_x=0.22,
-            legend_y=0.84,
+            legend_x=0,
+            legend_y=1.225,
+            legend_columns=2,
             xaxis_step=1,
             yaxis_step=0.20,  # type: ignore
             line_width=3,
-            font_size=20,
+            font_size=18,
             fig_save_width=1800,
             fig_save_height=900,
             save_file=True,
@@ -1291,7 +1315,7 @@ class HMD_helper:
             y=all_labels,
             y_legend_kp=all_labels,
             xaxis_range=[0, 11],
-            yaxis_range=[0.03, 0.11],
+            yaxis_range=[0.03, 0.12],
             yaxis_title="Yaw angle (radian)",
             xaxis_title_offset=-0.065,  # type: ignore
             yaxis_title_offset=0.17,  # type: ignore
@@ -1308,118 +1332,128 @@ class HMD_helper:
             ttest_annotation_x=1.7,  # type: ignore
             xaxis_step=1,
             yaxis_step=0.03,  # type: ignore
-            legend_x=0.1,
-            legend_y=0.225,
+            legend_x=0,
+            legend_y=1.225,
+            legend_columns=2,
             line_width=3,
             fig_save_width=1800,
             fig_save_height=900,
-            font_size=20,
+            font_size=18,
             save_file=True,
             save_final=True,
             custom_line_colors=[color_dict.get(label, None) for label in all_labels],
         )
 
-    def plot_individual_csvs_plotly(self, csv_paths, mapping_df):
+    def plot_individual_csvs(self, csv_paths, mapping_df, font_size=None, color_dict=None):
         """
-        Reads three CSV files, extracts the 'average' row, and creates 3 subplots
-        (bar charts), each showing 15 sound clip averages with standard deviation.
+        Plots individual participant responses from three CSV files as boxplots, with one subplot
+        for each metric (Annoyance, Informativeness, Noticeability) and one for the composite score.
+
+        Sound clip order and display names are taken from the mapping_df. Only clips found in all
+        CSV files will be plotted. Colors are set based on a user-defined color_dict.
 
         Parameters:
-            csv_paths (list of str): List of three file paths to CSVs.
+            csv_paths (list of str): List of three CSV file paths in the order:
+                                     [Annoyance, Informativeness, Noticeability].
+            mapping_df (pd.DataFrame): DataFrame with columns 'sound_clip_name' and 'display_name'
+                                       used to map internal sound clip names to human-readable labels.
+            font_size (int, optional): Font size for figure text.
+            color_dict (dict, optional): Dictionary mapping display names to specific plot colors.
         """
         if len(csv_paths) != 3:
             raise ValueError("Please provide exactly three CSV file paths.")
 
-        # Load display name mapping
-        mapping_dict = dict(zip(mapping_df['sound_clip_name'], mapping_df['display_name']))
+        color_dict = dict(zip(mapping_df['display_name'], mapping_df['colour']))
 
-        avgs, stds = [], []
+        # Load all data frames and get the set of common columns
+        all_data = []
+        all_columns_sets = []
 
         for path in csv_paths:
-            print(path)
             df = pd.read_csv(path)
-            avg_row = df[df['participant_id'] == 'average']
-            if avg_row.empty:
-                raise ValueError(f"No 'average' row found in {path}")
+            df = df[df['participant_id'] != 'average']
+            df_numeric = df.drop(columns='participant_id').astype(float)
+            all_data.append(df_numeric)
+            all_columns_sets.append(set(df_numeric.columns))
 
-            numeric_df = df[df['participant_id'] != 'average'].drop(columns='participant_id').astype(float)
-            std_row = numeric_df.std()
-            avg_row = avg_row.drop(columns='participant_id').iloc[0].astype(float)
+        # Compute the intersection of all column names across datasets
+        common_cols = set.intersection(*all_columns_sets)
 
-            avgs.append(avg_row)
-            stds.append(std_row)
+        # Filter mapping_df to only keep sound clips that exist in all datasets
+        mapping_df = mapping_df[mapping_df['sound_clip_name'].isin(common_cols)]
+        sorted_internal_names = mapping_df['sound_clip_name'].tolist()
+        sorted_display_names = mapping_df['display_name'].tolist()
 
-        columns = avgs[0].index.tolist()
-        display_names = [mapping_dict.get(col, col) for col in columns]
-        print(display_names)
+        # Reorder columns in all data frames
+        all_data = [df[sorted_internal_names] for df in all_data]
 
-        # Compute Composite Score (z-score normalized average with inverted Annoyance)
-        annoyance = avgs[0]
-        info = avgs[1]
-        notice = avgs[2]
+        # Compute composite score from annoyance, informativeness, noticeability
+        max_scale = 10
+        annoyance = all_data[0]
+        info = all_data[1]
+        notice = all_data[2]
 
-        max_scale = 10  # Assumed rating scale
         non_annoyance = max_scale - annoyance
-
-        z_annoyance = zscore(non_annoyance)
-        z_info = zscore(info)
-        z_notice = zscore(notice)
+        z_annoyance = zscore(non_annoyance, axis=0)
+        z_info = zscore(info, axis=0)
+        z_notice = zscore(notice, axis=0)
 
         composite = (z_annoyance + z_info + z_notice) / 3
-        composite_std = ((stds[0] + stds[1] + stds[2]) / 3).fillna(0)  # Optional, just for label
+        composite = pd.DataFrame(composite, columns=sorted_internal_names)
 
-        # subplot_titles = ['Annoyance', 'Info', 'Noticeability', 'Composite Score']
-        # fig = make_subplots(rows=2, cols=2, subplot_titles=subplot_titles)
-        fig = make_subplots(rows=2, cols=2, vertical_spacing=0.20)
+        plot_data = all_data + [composite]
 
-        data_to_plot = [
-            (avgs[0], stds[0]),
-            (avgs[1], stds[1]),
-            (avgs[2], stds[2]),
-            (composite, composite_std)
-        ]
+        # Define subplot layout and titles
+        subplot_titles = ['Noticeability', 'Informativeness', 'Annoyance', 'Composite score']
+        fig = make_subplots(rows=2, cols=2, subplot_titles=subplot_titles, vertical_spacing=0.25)
 
-        for i, (means, deviations) in enumerate(data_to_plot):
+        # Set subplot title font sizes
+        for annotation in fig['layout']['annotations']:
+            annotation['font'] = dict(size=font_size or common.get_configs('font_size'))
+
+        # Assign colors from color_dict
+        all_colors = [color_dict.get(label, None) for label in sorted_display_names]
+
+        # Plot each metric
+        for i, df_metric in enumerate(plot_data):
             row = (i // 2) + 1
             col = (i % 2) + 1
-            # Set y-axis range: fixed to 10 for first 3 plots, dynamic for composite
-            y_max = 13 if i < 3 else max(means) + 1.5
+            # y_max = 13 if i < 3 else df_metric.max().max() + 2
 
-            fig.add_trace(
-                go.Bar(
-                    x=display_names,
-                    y=means,
-                    # name=subplot_titles[i],
-                    showlegend=False
-                ),
-                row=row,
-                col=col
-            )
-
-            for x_val, y_val, m, d in zip(display_names, means, means, deviations):
-                fig.add_annotation(
-                    text=f"{m:.2f} ({d:.2f})",
-                    x=x_val,
-                    y=y_val + 0.15,
-                    showarrow=False,
-                    textangle=-90,
-                    font=dict(size=12),
-                    xanchor='center',
-                    yanchor='bottom',
+            for j, colname in enumerate(sorted_internal_names):
+                fig.add_trace(
+                    go.Box(
+                        y=df_metric[colname],
+                        name=sorted_display_names[j],
+                        boxpoints='outliers',
+                        marker_color=all_colors[j],
+                        line=dict(width=2),
+                        showlegend=False
+                    ),
                     row=row,
                     col=col
                 )
-            fig.update_yaxes(range=[0, y_max], row=row, col=col)
 
+            # fig.update_yaxes(range=[0, y_max], row=row, col=col)
+
+        # Layout settings
         fig.update_layout(
-            height=900,
+            font=dict(size=font_size or common.get_configs('font_size')),
+            height=1300,
             width=1600,
-            margin=dict(t=80, b=120, l=40, r=40),
+            margin=dict(t=80, b=100, l=40, r=40),
             showlegend=False
         )
-
         fig.update_xaxes(tickangle=45)
-        self.save_plotly(fig, 'bar_response', save_final=True)
+
+        # Save plot
+        self.save_plotly(
+            fig,
+            'boxplot_response',
+            height=1300,
+            width=1600,
+            save_final=True
+        )
 
     def plot_yaw_angle_histograms(self, mapping, angle=180, data_folder='_output', num_bins=None,
                                   smoothen_filter_param=False, calibrate=False):
