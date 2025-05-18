@@ -1289,7 +1289,7 @@ class HMD_helper:
             xaxis_range=[0, 11],
             yaxis_range=[0.03, 0.1],
             yaxis_title="Yaw angle (radian)",
-            xaxis_title_offset=-0.07,  # type: ignore
+            xaxis_title_offset=-0.065,  # type: ignore
             yaxis_title_offset=0.17,  # type: ignore
             name_file=f"all_videos_yaw_angle_{column_name}",
             show_text_labels=True,
