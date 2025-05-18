@@ -409,26 +409,24 @@ class HMD_helper:
         if save_mp4:
             fig.write_image(os.path.join(path, name + '.mp4'), width=width, height=height)
 
-    def plot_kp_slider_videos(self, df, y: list, y_legend_kp=None, x=None, events=None, events_width=1,
-                              events_dash='dot', events_colour='black', events_annotations_font_size=20,
-                              events_annotations_colour='black', xaxis_kp_title='Time (s)',
-                              yaxis_kp_title='Percentage of trials with response key pressed',
-                              xaxis_kp_title_offset=0, yaxis_kp_title_offset=0,
-                              xaxis_kp_range=None, yaxis_kp_range=None, stacked=False,
-                              pretty_text=False, orientation='v', xaxis_slider_title='Stimulus',
-                              yaxis_slider_show=False, yaxis_slider_title=None, show_text_labels=False,
-                              xaxis_ticklabels_slider_show=True, yaxis_ticklabels_slider_show=False,
-                              name_file='kp_videos_sliders', save_file=False, save_final=False,
-                              fig_save_width=1320, fig_save_height=680, legend_x=0.7, legend_y=0.95,
-                              font_family=None, font_size=None, ttest_signals=None, ttest_marker='circle',
-                              ttest_marker_size=3, ttest_marker_colour='black', ttest_annotations_font_size=10,
-                              ttest_annotations_colour='black', anova_signals=None, anova_marker='cross',
-                              anova_marker_size=3, anova_marker_colour='black', anova_annotations_font_size=10,
-                              anova_annotations_colour='black', ttest_anova_row_height=0.5, xaxis_step=5,
-                              yaxis_step=5, y_legend_bar=None, line_width=1, bar_font_size=None,
-                              custom_line_colors=None):
+    def plot_kp(self, df, y: list, y_legend_kp=None, x=None, events=None, events_width=1,
+                events_dash='dot', events_colour='black', events_annotations_font_size=20,
+                events_annotations_colour='black', xaxis_title='Time (s)',
+                yaxis_title='Percentage of trials with response key pressed',
+                xaxis_title_offset=0, yaxis_title_offset=0,
+                xaxis_range=None, yaxis_range=None, stacked=False,
+                pretty_text=False, orientation='v', show_text_labels=False,
+                name_file='kp', save_file=False, save_final=False,
+                fig_save_width=1320, fig_save_height=680, legend_x=0.7, legend_y=0.95,
+                font_family=None, font_size=None, ttest_signals=None, ttest_marker='circle',
+                ttest_marker_size=3, ttest_marker_colour='black', ttest_annotations_font_size=10,
+                ttest_annotations_colour='black', anova_signals=None, anova_marker='cross',
+                anova_marker_size=3, anova_marker_colour='black', anova_annotations_font_size=10,
+                anova_annotations_colour='black', ttest_anova_row_height=0.5, xaxis_step=5,
+                yaxis_step=5, y_legend_bar=None, line_width=1, bar_font_size=None,
+                custom_line_colors=None):
         """
-        Plot keypresses with multiple variables as a filter and slider questions for the stimuli.
+        Plot keypresses.
 
         Args:
             df (dataframe): DataFrame with stimuli data.
@@ -441,21 +439,16 @@ class HMD_helper:
             events_colour (str, optional): Colour of the vertical lines.
             events_annotations_font_size (int, optional): Font size for annotations on vertical lines.
             events_annotations_colour (str, optional): Colour for annotations on vertical lines.
-            xaxis_kp_title (str, optional): Title for x axis of the keypress plot.
-            yaxis_kp_title (str, optional): Title for y axis of the keypress plot.
-            xaxis_kp_title_offset (float, optional): Horizontal offset for x axis title of keypress plot.
-            yaxis_kp_title_offset (float, optional): Vertical offset for y axis title of keypress plot.
-            xaxis_kp_range (list or None, optional): Range of x axis in format [min, max] for keypress plot.
-            yaxis_kp_range (list or None, optional): Range of y axis in format [min, max] for keypress plot.
+            xaxis_title (str, optional): Title for x axis of the keypress plot.
+            yaxis_title (str, optional): Title for y axis of the keypress plot.
+            xaxis_title_offset (float, optional): Horizontal offset for x axis title of keypress plot.
+            yaxis_title_offset (float, optional): Vertical offset for y axis title of keypress plot.
+            xaxis_range (list or None, optional): Range of x axis in format [min, max] for keypress plot.
+            yaxis_range (list or None, optional): Range of y axis in format [min, max] for keypress plot.
             stacked (bool, optional): Whether to show bars as stacked chart.
             pretty_text (bool, optional): Prettify tick labels by replacing underscores with spaces and capitalizing.
             orientation (str, optional): Orientation of bars; 'v' = vertical, 'h' = horizontal.
-            xaxis_slider_title (str, optional): Title for x axis of the slider data plot.
-            yaxis_slider_show (bool, optional): Whether to show y axis on slider plot.
-            yaxis_slider_title (str, optional): Title for y axis of the slider data plot.
             show_text_labels (bool, optional): Whether to output automatically positioned text labels.
-            xaxis_ticklabels_slider_show (bool, optional): Whether to show tick labels for slider x axis.
-            yaxis_ticklabels_slider_show (bool, optional): Whether to show tick labels for slider y axis.
             name_file (str, optional): Name of file to save.
             save_file (bool, optional): Whether to save the plot as an HTML file.
             save_final (bool, optional): Whether to save the figure as a final image in /figures.
@@ -484,23 +477,20 @@ class HMD_helper:
             line_width (int): Line width for keypress data plot.
         """
 
-        # logger.info('Creating figure keypress and slider data for {}.', df.index.tolist())
+        logger.info('Creating keypress figure.')
         # calculate times
         times = df['Timestamp'].values
         # plotly
-        fig = subplots.make_subplots(rows=1,
-                                     cols=1,
-                                     shared_xaxes=False,
-                                     shared_yaxes=False)
+        fig = go.Figure()
         # adjust ylim, if ttest results need to be plotted
         if ttest_signals:
             # assume one row takes ttest_anova_row_height on y axis
-            yaxis_kp_range[0] = (yaxis_kp_range[0] - len(ttest_signals) * ttest_anova_row_height - ttest_anova_row_height)  # noqa: E501  # type: ignore
+            yaxis_range[0] = (yaxis_range[0] - len(ttest_signals) * ttest_anova_row_height - ttest_anova_row_height)  # noqa: E501  # type: ignore
 
         # adjust ylim, if anova results need to be plotted
         if anova_signals:
             # assume one row takes ttest_anova_row_height on y axis
-            yaxis_kp_range[0] = (yaxis_kp_range[0] - len(anova_signals) * ttest_anova_row_height - ttest_anova_row_height)  # noqa: E501  # type: ignore
+            yaxis_range[0] = (yaxis_range[0] - len(anova_signals) * ttest_anova_row_height - ttest_anova_row_height)  # noqa: E501  # type: ignore
 
         # track plotted values to compute min/max for ticks
         all_values = []
@@ -529,11 +519,11 @@ class HMD_helper:
                                      x=times,
                                      line=dict(width=line_width,
                                                color=custom_line_colors[row_number] if custom_line_colors else None),
-                                     name=name), row=1, col=1)
+                                     name=name))
 
         # draw events
         HMD_helper.draw_events(fig=fig,
-                               yaxis_range=yaxis_kp_range,
+                               yaxis_range=yaxis_range,
                                events=events,
                                events_width=events_width,
                                events_dash=events_dash,
@@ -543,9 +533,11 @@ class HMD_helper:
 
         # update axis
         if xaxis_step:
-            fig.update_xaxes(title_text=xaxis_kp_title, range=xaxis_kp_range, dtick=xaxis_step, row=1, col=1)
+            fig.update_xaxes(title_text=xaxis_title, range=xaxis_range, dtick=xaxis_step,
+                             title_font=dict(size=font_size or common.get_configs('font_size')))
         else:
-            fig.update_xaxes(title_text=xaxis_kp_title, range=xaxis_kp_range, row=1, col=1)
+            fig.update_xaxes(title_text=xaxis_title, range=xaxis_range,
+                             title_font=dict(size=font_size or common.get_configs('font_size')))
         # Find actual y range across all series
         # actual_ymin = min([min(df[y_col]) for y_col in y])
         # actual_ymax = max([max(df[y_col]) for y_col in y])
@@ -566,18 +558,18 @@ class HMD_helper:
             showgrid=True,
             range=[actual_ymin, actual_ymax],
             tickvals=visible_ticks,  # only show ticks for data range
-            tickformat='.2f',
-            row=1, col=1
+            tickformat='.2f'
         )
 
         fig.add_annotation(
-            text=yaxis_kp_title,
-            xref='paper', yref='paper',
-            x=xaxis_kp_title_offset,  # left side of the plot
-            y=0.5 + yaxis_kp_title_offset,  # middle + offset
+            text=yaxis_title,
+            xref='paper',
+            yref='paper',
+            x=xaxis_title_offset,  # left side of the plot
+            y=0.5 + yaxis_title_offset,  # middle + offset
             showarrow=False,
             textangle=-90,
-            # font=dict(size=font_size or common.get_configs('font_size')),
+            font=dict(size=font_size or common.get_configs('font_size')),
             xanchor='center',
             yanchor='middle'
         )
@@ -601,7 +593,7 @@ class HMD_helper:
         self.draw_ttest_anova(fig=fig,
                               times=times,
                               name_file=name_file,
-                              yaxis_range=yaxis_kp_range,
+                              yaxis_range=yaxis_range,
                               yaxis_step=yaxis_step,
                               ttest_signals=ttest_signals,
                               ttest_marker=ttest_marker,
@@ -616,30 +608,20 @@ class HMD_helper:
                               anova_annotations_font_size=anova_annotations_font_size,
                               anova_annotations_colour=anova_annotations_colour,
                               ttest_anova_row_height=ttest_anova_row_height)
-        # update axis
-        fig.update_xaxes(title_text=None, row=1, col=2)
-        fig.update_xaxes(title_text=None, row=2, col=2)
-        fig.update_yaxes(title_text=yaxis_slider_title, row=2, col=2)
-        fig.update_yaxes(visible=yaxis_slider_show, row=1, col=2)
-        fig.update_yaxes(visible=yaxis_slider_show, row=2, col=2)
-        fig.update_xaxes(showticklabels=False, row=1, col=2)
-        fig.update_yaxes(showticklabels=yaxis_ticklabels_slider_show, row=2, col=2)
-        fig.update_xaxes(showticklabels=xaxis_ticklabels_slider_show, row=1, col=2)
-        fig.update_yaxes(showticklabels=yaxis_ticklabels_slider_show, row=2, col=2)
         # update template
         fig.update_layout(template=self.template)
-        # manually add grid lines for non-negative y values only
-        for y in np.arange(0, yaxis_kp_range[1] + 0.01, yaxis_step):  # type: ignore
-            fig.add_shape(type="line",
-                          x0=fig.layout.xaxis.range[0] if fig.layout.xaxis.range else 0,
-                          x1=fig.layout.xaxis.range[1] if fig.layout.xaxis.range else 1,
-                          y0=y,
-                          y1=y,
-                          line=dict(color='#333333' if common.get_configs('plotly_template') == 'plotly_dark' else '#e5ecf6',  # noqa: E501
-                                    width=1),
-                          xref='x',
-                          yref='y',
-                          layer='below')
+        # # manually add grid lines for non-negative y values only
+        # for y in np.arange(0, yaxis_range[1] + 0.01, yaxis_step):  # type: ignore
+        #     fig.add_shape(type="line",
+        #                   x0=fig.layout.xaxis.range[0] if fig.layout.xaxis.range else 0,
+        #                   x1=fig.layout.xaxis.range[1] if fig.layout.xaxis.range else 1,
+        #                   y0=y,
+        #                   y1=y,
+        #                   line=dict(color='#333333' if common.get_configs('plotly_template') == 'plotly_dark' else '#e5ecf6',  # noqa: E501
+        #                             width=1),
+        #                   xref='x',
+        #                   yref='y',
+        #                   layer='below')
         # format text labels
         if show_text_labels:
             fig.update_traces(texttemplate='%{text:.2f}')
@@ -651,7 +633,7 @@ class HMD_helper:
         fig.update_layout(legend=dict(x=legend_x,
                                       y=legend_y,
                                       bgcolor='rgba(0,0,0,0)',
-                                      font=dict(size=13)))
+                                      font=dict(size=font_size)))
 
         # update font family
         if font_family:
@@ -741,7 +723,7 @@ class HMD_helper:
                                              showlegend=False,
                                              hovertemplate=f"{comp['label']}: time=%{{x}}, p=%{{text}}"))
                     # label row
-                    fig.add_annotation(x=times[0] - (times[-1] - times[0]) * 0.0,
+                    fig.add_annotation(x=1.2,
                                        y=y_offset,
                                        text=comp['label'],
                                        xanchor='right',
@@ -1097,7 +1079,7 @@ class HMD_helper:
 
         combined_df.to_csv(output_file, index=False)
 
-    def plot_column(self, mapping, column_name="TriggerValueRight"):
+    def plot_column(self, mapping, column_name="TriggerValueRight", xaxis_title=None, yaxis_title=None, xaxis_range=None, yaxis_range=None):
         """
         Generate a comparison plot of keypress data and subjective slider ratings
         across different video trials relative to a test condition.
@@ -1179,32 +1161,35 @@ class HMD_helper:
         events.append({'id': 1,
                        'start': 8.7,  # type: ignore
                        'end': 8.7,  # type: ignore
-                       'annotation': 'Overtake'})
+                       'annotation': ''})
 
         # Plotting
-        self.plot_kp_slider_videos(
+        self.plot_kp(
             df=combined_df,
             y=all_labels,
             y_legend_kp=all_labels,
-            yaxis_kp_range=[0.45, 1],
-            yaxis_slider_title="Slider rating (%)",
-            xaxis_kp_title_offset=-0.035,  # type: ignore
-            yaxis_kp_title_offset=0.18,  # type: ignore
-            yaxis_kp_title="Trigger pressure level",
+            xaxis_range=xaxis_range,
+            yaxis_range=yaxis_range,
+            xaxis_title=xaxis_title,
+            xaxis_title_offset=-0.055,  # type: ignore
+            yaxis_title_offset=0.18,  # type: ignore
+            yaxis_title=yaxis_title,
             name_file=f"all_videos_kp_slider_plot_{column_name}",
             show_text_labels=True,
             pretty_text=True,
             events=events,
-            events_annotations_font_size=12,
+            events_width=2,
+            events_annotations_font_size=13,
             stacked=False,
             ttest_signals=ttest_signals,
             ttest_anova_row_height=0.03,
-            legend_x=0.3,
-            legend_y=0.8,
-            xaxis_step=3,
-            yaxis_step=0.25,  # type: ignore
+            ttest_annotations_font_size=13,
+            legend_x=0.22,
+            legend_y=0.84,
+            xaxis_step=1,
+            yaxis_step=0.20,  # type: ignore
             line_width=3,
-            font_size=18,
+            font_size=20,
             fig_save_width=1800,
             fig_save_height=900,
             save_file=True,
@@ -1294,14 +1279,14 @@ class HMD_helper:
             combined_df[label] = df[column_name]
 
         # Plotting
-        self.plot_kp_slider_videos(
+        self.plot_kp(
             df=combined_df,
             y=all_labels,
             y_legend_kp=all_labels,
-            yaxis_kp_range=[0.03, 0.1],
-            yaxis_kp_title="Radian",
-            xaxis_kp_title_offset=-0.04,  # type: ignore
-            yaxis_kp_title_offset=0.17,  # type: ignore
+            yaxis_range=[0.03, 0.1],
+            yaxis_title="Radian",
+            xaxis_title_offset=-0.04,  # type: ignore
+            yaxis_title_offset=0.17,  # type: ignore
             name_file=f"all_videos_yaw_angle_{column_name}",
             show_text_labels=True,
             pretty_text=True,
