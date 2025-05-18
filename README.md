@@ -198,17 +198,17 @@ Mean yaw angle of head movement of pedestrians as a function of time for each so
 Histogram of yaw angle of head movement of pedestrians as a function of time for each sound stimulus. The value of 0 denotes participants looking perpendicular to the road, negative values correspond to the left direction (vehicle approach) and vice versa.
 
 ## Subjective responses
-[![Barplot responses](figures/boxplot_repsonse.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/boxplot_repsonse.html)
+[![Barplot responses](figures/boxplot_response.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/boxplot_response.html)
 Bar plots of the ratings for the questions regarding (top left) noticeability, (top right) informativeness, (bottom left) annoyance, and composite score (bottom right) per sound stimulus
 
-[![Boxplot responses](figures/bar_repsonse.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/bar_repsonse.html)
+[![Boxplot responses](figures/bar_response.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/bar_response.html)
 Box plots of the ratings for the questions regarding (top left) noticeability, (top right) informativeness, (bottom left) annoyance, and composite score (bottom right) per sound stimulus
 
 ## Information on participants
-[![Gender](figures/gender.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/gender.html)
+[![Gender](figures/what_is_your_gender.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/what_is_your_gender.html)
 Gender of the participants.
 
-[![Age](figures/age.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/age.html)
+[![Age](figures/what_is_your_age_(in_years).png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/what_is_your_age_(in_years).html)
 Age distribution of participants.
 
 [![Hearing Aid](figures/are_you_wearing_any_seeing_aids_during_the_experiments.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/are_you_wearing_any_seeing_aids_during_the_experiments.html)
