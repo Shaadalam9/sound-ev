@@ -3,7 +3,6 @@ import os
 import glob
 import plotly.graph_objects as go
 import plotly as py
-from plotly import subplots
 from plotly.subplots import make_subplots
 # For OneEuroFilter, see https://github.com/casiez/OneEuroFilter
 from OneEuroFilter import OneEuroFilter
@@ -29,8 +28,6 @@ SAVE_PNG = True
 SAVE_EPS = True
 
 
-# TODO: Mark the time when the car has started to become visible, started to yield,
-# stopped, started to accelerate and taking a turn finally
 class HMD_helper:
 
     # set template for plotly output
@@ -558,15 +555,21 @@ class HMD_helper:
             showgrid=True,
             range=[actual_ymin, actual_ymax],
             tickvals=visible_ticks,  # only show ticks for data range
-            tickformat='.2f'
+            tickformat='.2f',
+            automargin=True,
+            title=dict(
+                        text="",
+                        # font=dict(size=font_size or common.get_configs('font_size')),
+                        standoff=40
+            )
         )
 
         fig.add_annotation(
             text=yaxis_title,
             xref='paper',
             yref='paper',
-            x=xaxis_title_offset,  # left side of the plot
-            y=0.5 + yaxis_title_offset,  # middle + offset
+            x=xaxis_title_offset,     # still left side
+            y=0.5 + yaxis_title_offset,  # ⬅️ push label higher (was 0.5 + offset)
             showarrow=False,
             textangle=-90,
             font=dict(size=font_size or common.get_configs('font_size')),
@@ -1081,7 +1084,8 @@ class HMD_helper:
 
         combined_df.to_csv(output_file, index=False)
 
-    def plot_column(self, mapping, column_name="TriggerValueRight", xaxis_title=None, yaxis_title=None, xaxis_range=None, yaxis_range=None):
+    def plot_column(self, mapping, column_name="TriggerValueRight", xaxis_title=None, yaxis_title=None,
+                    xaxis_range=None, yaxis_range=None):
         """
         Generate a comparison plot of keypress data and subjective slider ratings
         across different video trials relative to a test condition.
@@ -1172,10 +1176,10 @@ class HMD_helper:
             y_legend_kp=all_labels,
             xaxis_range=xaxis_range,
             yaxis_range=yaxis_range,
-            xaxis_title=xaxis_title,
+            xaxis_title=xaxis_title,  # type: ignore
             xaxis_title_offset=-0.055,  # type: ignore
             yaxis_title_offset=0.18,  # type: ignore
-            yaxis_title=yaxis_title,
+            yaxis_title=yaxis_title,  # type: ignore
             name_file=f"all_videos_kp_slider_plot_{column_name}",
             show_text_labels=True,
             pretty_text=True,
@@ -1186,7 +1190,7 @@ class HMD_helper:
             ttest_signals=ttest_signals,
             ttest_anova_row_height=0.03,
             ttest_annotations_font_size=13,
-            ttest_annotation_x=1.2,
+            ttest_annotation_x=1.2,  # type: ignore
             legend_x=0.22,
             legend_y=0.84,
             xaxis_step=1,
@@ -1287,7 +1291,7 @@ class HMD_helper:
             y=all_labels,
             y_legend_kp=all_labels,
             xaxis_range=[0, 11],
-            yaxis_range=[0.03, 0.1],
+            yaxis_range=[0.03, 0.11],
             yaxis_title="Yaw angle (radian)",
             xaxis_title_offset=-0.065,  # type: ignore
             yaxis_title_offset=0.17,  # type: ignore
@@ -1301,7 +1305,7 @@ class HMD_helper:
             ttest_signals=ttest_signals,
             ttest_anova_row_height=0.01,
             ttest_annotations_font_size=13,
-            ttest_annotation_x=1.7,
+            ttest_annotation_x=1.7,  # type: ignore
             xaxis_step=1,
             yaxis_step=0.03,  # type: ignore
             legend_x=0.1,
@@ -1332,6 +1336,7 @@ class HMD_helper:
         avgs, stds = [], []
 
         for path in csv_paths:
+            print(path)
             df = pd.read_csv(path)
             avg_row = df[df['participant_id'] == 'average']
             if avg_row.empty:
@@ -1346,6 +1351,7 @@ class HMD_helper:
 
         columns = avgs[0].index.tolist()
         display_names = [mapping_dict.get(col, col) for col in columns]
+        print(display_names)
 
         # Compute Composite Score (z-score normalized average with inverted Annoyance)
         annoyance = avgs[0]
@@ -1431,6 +1437,7 @@ class HMD_helper:
         file_paths = sorted([
             f for f in all_files
             if re.match(r'.*participant_Yaw_trial_\d+\.csv$', os.path.basename(f))
+
         ])
 
         fig = go.Figure()
