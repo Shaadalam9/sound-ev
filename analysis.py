@@ -80,13 +80,13 @@ if __name__ == "__main__":
     #                        output_folder="output",
     #                        save_file=True)
     # HMD.avg_csv_files(data_folder, mapping)
-    HMD.plot_column(mapping,
-                    column_name="TriggerValueRight",
-                    xaxis_range=[0, 11],
-                    yaxis_range=[0.45, 1],
-                    xaxis_title="Time (s)",
-                    yaxis_title="Percentage of trial with response key pressed")
-    # HMD.plot_yaw(mapping)
+    # HMD.plot_column(mapping,
+    #                 column_name="TriggerValueRight",
+    #                 xaxis_range=[0, 11],
+    #                 yaxis_range=[0.45, 1],
+    #                 xaxis_title="Time (s)",
+    #                 yaxis_title="Percentage of trial with response key pressed")
+    HMD.plot_yaw(mapping)
     # HMD.plot_individual_csvs_plotly(["_output/slider_input_annoyance.csv",
     #                                  "_output/slider_input_info.csv",
     #                                  "_output/slider_input_noticeability.csv"], mapping)

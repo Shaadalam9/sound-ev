@@ -420,7 +420,7 @@ class HMD_helper:
                 fig_save_width=1320, fig_save_height=680, legend_x=0.7, legend_y=0.95,
                 font_family=None, font_size=None, ttest_signals=None, ttest_marker='circle',
                 ttest_marker_size=3, ttest_marker_colour='black', ttest_annotations_font_size=10,
-                ttest_annotations_colour='black', anova_signals=None, anova_marker='cross',
+                ttest_annotation_x=0, ttest_annotations_colour='black', anova_signals=None, anova_marker='cross',
                 anova_marker_size=3, anova_marker_colour='black', anova_annotations_font_size=10,
                 anova_annotations_colour='black', ttest_anova_row_height=0.5, xaxis_step=5,
                 yaxis_step=5, y_legend_bar=None, line_width=1, bar_font_size=None,
@@ -607,7 +607,8 @@ class HMD_helper:
                               anova_marker_colour=anova_marker_colour,
                               anova_annotations_font_size=anova_annotations_font_size,
                               anova_annotations_colour=anova_annotations_colour,
-                              ttest_anova_row_height=ttest_anova_row_height)
+                              ttest_anova_row_height=ttest_anova_row_height,
+                              ttest_annotation_x=ttest_annotation_x)
         # update template
         fig.update_layout(template=self.template)
         # # manually add grid lines for non-negative y values only
@@ -664,7 +665,8 @@ class HMD_helper:
     def draw_ttest_anova(self, fig, times, name_file, yaxis_range, yaxis_step, ttest_signals, ttest_marker,
                          ttest_marker_size, ttest_marker_colour, ttest_annotations_font_size, ttest_annotations_colour,
                          anova_signals, anova_marker, anova_marker_size, anova_marker_colour,
-                         anova_annotations_font_size, anova_annotations_colour, ttest_anova_row_height):
+                         anova_annotations_font_size, anova_annotations_colour, ttest_anova_row_height,
+                         ttest_annotation_x):
         """Draw ttest and anova test rows.
 
         Args:
@@ -723,7 +725,7 @@ class HMD_helper:
                                              showlegend=False,
                                              hovertemplate=f"{comp['label']}: time=%{{x}}, p=%{{text}}"))
                     # label row
-                    fig.add_annotation(x=1.2,
+                    fig.add_annotation(x=ttest_annotation_x,
                                        y=y_offset,
                                        text=comp['label'],
                                        xanchor='right',
@@ -1184,6 +1186,7 @@ class HMD_helper:
             ttest_signals=ttest_signals,
             ttest_anova_row_height=0.03,
             ttest_annotations_font_size=13,
+            ttest_annotation_x=1.2,
             legend_x=0.22,
             legend_y=0.84,
             xaxis_step=1,
@@ -1273,7 +1276,7 @@ class HMD_helper:
         events.append({'id': 1,
                        'start': 8.7,  # type: ignore
                        'end': 8.7,  # type: ignore
-                       'annotation': 'Overtake'})
+                       'annotation': ''})
 
         for df, label in zip(all_dfs, all_labels):
             combined_df[label] = df[column_name]
@@ -1283,26 +1286,30 @@ class HMD_helper:
             df=combined_df,
             y=all_labels,
             y_legend_kp=all_labels,
+            xaxis_range=[0, 11],
             yaxis_range=[0.03, 0.1],
-            yaxis_title="Radian",
-            xaxis_title_offset=-0.04,  # type: ignore
+            yaxis_title="Yaw angle (radian)",
+            xaxis_title_offset=-0.07,  # type: ignore
             yaxis_title_offset=0.17,  # type: ignore
             name_file=f"all_videos_yaw_angle_{column_name}",
             show_text_labels=True,
             pretty_text=True,
             events=events,
-            events_annotations_font_size=12,
+            events_width=2,
+            events_annotations_font_size=13,
             stacked=False,
             ttest_signals=ttest_signals,
             ttest_anova_row_height=0.01,
-            xaxis_step=2,
+            ttest_annotations_font_size=13,
+            ttest_annotation_x=1.7,
+            xaxis_step=1,
             yaxis_step=0.03,  # type: ignore
             legend_x=0.1,
             legend_y=0.225,
             line_width=3,
             fig_save_width=1800,
             fig_save_height=900,
-            font_size=18,
+            font_size=20,
             save_file=True,
             save_final=True,
             custom_line_colors=[color_dict.get(label, None) for label in all_labels],
