@@ -1455,6 +1455,116 @@ class HMD_helper:
             save_final=True
         )
 
+    def plot_individual_csvs_barplot(self, csv_paths, mapping_df, font_size=None):
+        """
+        Reads three CSV files, extracts the 'average' row, and creates 3 subplots
+        (bar charts), each showing 15 sound clip averages with standard deviation.
+
+        Parameters:
+            csv_paths (list of str): List of three file paths to CSVs.
+        """
+        if len(csv_paths) != 3:
+            raise ValueError("Please provide exactly three CSV file paths.")
+
+        # Load display name mapping
+        mapping_dict = dict(zip(mapping_df['sound_clip_name'], mapping_df['display_name']))
+
+        avgs, stds = [], []
+
+        for path in csv_paths:
+            print(path)
+            df = pd.read_csv(path)
+            avg_row = df[df['participant_id'] == 'average']
+            if avg_row.empty:
+                raise ValueError(f"No 'average' row found in {path}")
+
+            numeric_df = df[df['participant_id'] != 'average'].drop(columns='participant_id').astype(float)
+            std_row = numeric_df.std()
+            avg_row = avg_row.drop(columns='participant_id').iloc[0].astype(float)
+
+            avgs.append(avg_row)
+            stds.append(std_row)
+
+        columns = avgs[0].index.tolist()
+        display_names = [mapping_dict.get(col, col) for col in columns]
+
+        # Compute Composite Score (z-score normalized average with inverted Annoyance)
+        annoyance = avgs[0]
+        info = avgs[1]
+        notice = avgs[2]
+
+        max_scale = 10  # Assumed rating scale
+        non_annoyance = max_scale - annoyance
+
+        z_annoyance = zscore(non_annoyance)
+        z_info = zscore(info)
+        z_notice = zscore(notice)
+
+        composite = (z_annoyance + z_info + z_notice) / 3
+        composite_std = ((stds[0] + stds[1] + stds[2]) / 3).fillna(0)  # Optional, just for label
+
+        subplot_titles = ['Noticeability', 'Informativeness', 'Annoyance', 'Composite score']
+        fig = make_subplots(rows=2, cols=2, subplot_titles=subplot_titles, vertical_spacing=0.3)
+        # Make subplot titles larger
+        for annotation in fig['layout']['annotations']:
+            annotation['font'] = dict(size=font_size or common.get_configs('font_size'))
+
+        data_to_plot = [
+            (avgs[0], stds[0]),
+            (avgs[1], stds[1]),
+            (avgs[2], stds[2]),
+            (composite, composite_std)
+        ]
+
+        for i, (means, deviations) in enumerate(data_to_plot):
+            row = (i // 2) + 1
+            col = (i % 2) + 1
+            # Set y-axis range: fixed to 10 for first 3 plots, dynamic for composite
+            # y_max = 13 if i < 3 else max(means) + 1.5
+
+            fig.add_trace(
+                go.Bar(
+                    x=display_names,
+                    y=means,
+                    # name=subplot_titles[i],
+                    showlegend=False
+                ),
+                row=row,
+                col=col
+            )
+
+            for x_val, y_val, m, d in zip(display_names, means, means, deviations):
+                fig.add_annotation(
+                    text=f"{m:.2f} ({d:.2f})",
+                    x=x_val,
+                    y=y_val + 0.15,
+                    showarrow=False,
+                    textangle=-90,
+                    font=dict(size=15),
+                    xanchor='center',
+                    yanchor='bottom',
+                    row=row,
+                    col=col
+                )
+            # hardcode ylim for the first 3 plots
+            if i < 3:
+                fig.update_yaxes(range=[0, 12], row=row, col=col)
+
+        fig.update_layout(
+            font=dict(size=font_size or common.get_configs('font_size')),
+            height=1000,
+            width=1600,
+            margin=dict(t=20, b=120, l=40, r=40),
+            showlegend=False
+        )
+
+        fig.update_xaxes(tickangle=45)
+        self.save_plotly(fig,
+                         'bar_response',
+                         height=1000,
+                         width=1600,
+                         save_final=True)
+
     def plot_yaw_angle_histograms(self, mapping, angle=180, data_folder='_output', num_bins=None,
                                   smoothen_filter_param=False, calibrate=False):
         """

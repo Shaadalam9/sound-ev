@@ -92,4 +92,8 @@ if __name__ == "__main__":
                               "_output/slider_input_info.csv",
                               "_output/slider_input_annoyance.csv"
                               ], mapping)
+    HMD.plot_individual_csvs_barplot(["_output/slider_input_noticeability.csv",
+                                      "_output/slider_input_info.csv",
+                                      "_output/slider_input_annoyance.csv"
+                                      ], mapping)
     # HMD.plot_yaw_angle_histograms(mapping, angle=10, num_bins=30, calibrate=False, smoothen_filter_param=False)
