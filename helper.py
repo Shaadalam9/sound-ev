@@ -1469,10 +1469,9 @@ class HMD_helper:
         # Load display name mapping
         mapping_dict = dict(zip(mapping_df['sound_clip_name'], mapping_df['display_name']))
 
-        avgs, stds = [], []
+        avgs, stds, all_columns_sets = [], [], []
 
         for path in csv_paths:
-            print(path)
             df = pd.read_csv(path)
             avg_row = df[df['participant_id'] == 'average']
             if avg_row.empty:
@@ -1484,6 +1483,20 @@ class HMD_helper:
 
             avgs.append(avg_row)
             stds.append(std_row)
+            all_columns_sets.append(set(numeric_df.columns))
+
+        # Determine sound clips common to all CSVs
+        common_cols = set.intersection(*all_columns_sets)
+
+        # Filter and sort mapping_df
+        mapping_df = mapping_df[mapping_df['sound_clip_name'].isin(common_cols)]
+        sorted_internal_names = mapping_df['sound_clip_name'].tolist()
+        sorted_display_names = mapping_df['display_name'].tolist()
+        mapping_dict = dict(zip(sorted_internal_names, sorted_display_names))
+
+        # Reorder averages and stds based on mapping order
+        avgs = [avg[sorted_internal_names] for avg in avgs]
+        stds = [std[sorted_internal_names] for std in stds]
 
         columns = avgs[0].index.tolist()
         display_names = [mapping_dict.get(col, col) for col in columns]
