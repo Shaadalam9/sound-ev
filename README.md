@@ -1,6 +1,46 @@
 # Electric vehicles emitting sound
 Framework for the analysis of different sounds emitted by an automated car while pedestrian is crossing the road.
 
+## Analysis
+Analysis can be started by running python `sound-ev/analysis.py`. A number of CSV files used for data processing are saved in `sound-ev/_output/`. Visualisations of all data are saved in `sound-ev/_output/figures/`.
+
+## Keypress data
+[![Keypress](figures/all_videos_kp_slider_plot_TriggerValueRight.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/all_videos_kp_slider_plot_TriggerValueRight.html)
+Percentage of the participants who pressed the key (i.e. felt safe to cross in front of the EV) as a function of time for each sound stimulus. The vertical line represents the passing moment. The asterisks at the bottom indicate significant differences with respect to ’Diesel’ sound, p < 0.05.
+
+## Head rotation
+[![Yaw angle](figures/all_videos_yaw_angle_Yaw.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/all_videos_yaw_angle_Yaw.html)
+Mean yaw angle of head movement of pedestrians as a function of time for each sound stimulus. The value of 0 denotes participants looking perpendicular to the road, negative values correspond to the left direction (vehicle approach) and vice versa. The vertical line represents the passing moment. The asterisks at the bottom indicate significant differences with respect to 'Diesel' sound, p < 0.05.
+
+[![Histogram of yaw angle](figures/histogram.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/histogram.html)
+Histogram of yaw angle of head movement of pedestrians as a function of time for each sound stimulus. The value of 0 denotes participants looking perpendicular to the road, negative values correspond to the left direction (vehicle approach) and vice versa.
+
+## Subjective responses
+[![Barplot responses](figures/boxplot_response.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/boxplot_response.html)
+Bar plots of the ratings for the questions regarding (top left) noticeability, (top right) informativeness, (bottom left) annoyance, and composite score (bottom right) per sound stimulus
+
+[![Boxplot responses](figures/bar_response.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/bar_response.html)
+Box plots of the ratings for the questions regarding (top left) noticeability, (top right) informativeness, (bottom left) annoyance, and composite score (bottom right) per sound stimulus
+
+## Information on participants
+[![Gender](figures/what_is_your_gender.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/what_is_your_gender.html)
+Gender of the participants.
+
+[![Age](figures/what_is_your_age_(in_years).png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/what_is_your_age_(in_years).html)
+Age distribution of participants.
+
+[![Hearing Aid](figures/are_you_wearing_any_seeing_aids_during_the_experiments.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/are_you_wearing_any_seeing_aids_during_the_experiments.html)
+Are you wearing any seeing aids during the experiments?
+
+[![License](figures/at_which_age_did_you_obtain_your_first_license_for_driving_a_car_or_motorcycle.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/at_which_age_did_you_obtain_your_first_license_for_driving_a_car_or_motorcycle.html)
+At which age did you obtain your first license for driving a car or motorcycle?
+
+[![Transportation](figures/what_is_your_primary_mode_of_transportation.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/what_is_your_primary_mode_of_transportation.html)
+What is your primary mode of transportation?
+
+[![Driving](figures/about_how_many_kilometers_(miles)_did_you_drive_in_the_last_12_months.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/about_how_many_kilometers_(miles)_did_you_drive_in_the_last_12_months.html)
+"About how many kilometers (miles) did you drive in the last 12 months?"
+
 ## Setup
 Tested with Python 3.9.20. To setup the environment run these two commands in a parent folder of the downloaded repository (replace `/` with `\` and possibly add `--user` if on Windows):
 
@@ -182,46 +222,6 @@ The experiment captures and saves data for analysis in the `data` folder. The fo
 
    - **Response Data**:  
      A separate CSV file is generated to store responses to the questions asked between trials.
-
-## Analysis
-Analysis can be started by running python `sound-ev/analysis.py`. A number of CSV files used for data processing are saved in `sound-ev/_output/`. Visualisations of all data are saved in `sound-ev/_output/figures/`.
-
-## Keypress data
-[![Keypress](figures/all_videos_kp_slider_plot_TriggerValueRight.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/all_videos_kp_slider_plot_TriggerValueRight.html)
-Percentage of the participants who pressed the key (i.e. felt safe to cross in front of the EV) as a function of time for each sound stimulus. The vertical line represents the passing moment. The asterisks at the bottom indicate significant differences with respect to ’Diesel’ sound, p < 0.05.
-
-## Head rotation
-[![Yaw angle](figures/all_videos_yaw_angle_Yaw.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/all_videos_yaw_angle_Yaw.html)
-Mean yaw angle of head movement of pedestrians as a function of time for each sound stimulus. The value of 0 denotes participants looking perpendicular to the road, negative values correspond to the left direction (vehicle approach) and vice versa. The vertical line represents the passing moment. The asterisks at the bottom indicate significant differences with respect to 'Diesel' sound, p < 0.05.
-
-[![Histogram of yaw angle](figures/histogram.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/histogram.html)
-Histogram of yaw angle of head movement of pedestrians as a function of time for each sound stimulus. The value of 0 denotes participants looking perpendicular to the road, negative values correspond to the left direction (vehicle approach) and vice versa.
-
-## Subjective responses
-[![Barplot responses](figures/boxplot_response.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/boxplot_response.html)
-Bar plots of the ratings for the questions regarding (top left) noticeability, (top right) informativeness, (bottom left) annoyance, and composite score (bottom right) per sound stimulus
-
-[![Boxplot responses](figures/bar_response.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/bar_response.html)
-Box plots of the ratings for the questions regarding (top left) noticeability, (top right) informativeness, (bottom left) annoyance, and composite score (bottom right) per sound stimulus
-
-## Information on participants
-[![Gender](figures/what_is_your_gender.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/what_is_your_gender.html)
-Gender of the participants.
-
-[![Age](figures/what_is_your_age_(in_years).png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/what_is_your_age_(in_years).html)
-Age distribution of participants.
-
-[![Hearing Aid](figures/are_you_wearing_any_seeing_aids_during_the_experiments.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/are_you_wearing_any_seeing_aids_during_the_experiments.html)
-Are you wearing any seeing aids during the experiments?
-
-[![License](figures/at_which_age_did_you_obtain_your_first_license_for_driving_a_car_or_motorcycle.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/at_which_age_did_you_obtain_your_first_license_for_driving_a_car_or_motorcycle.html)
-At which age did you obtain your first license for driving a car or motorcycle?
-
-[![Transportation](figures/what_is_your_primary_mode_of_transportation.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/what_is_your_primary_mode_of_transportation.html)
-What is your primary mode of transportation?
-
-[![Driving](figures/about_how_many_kilometers_(miles)_did_you_drive_in_the_last_12_months.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/about_how_many_kilometers_(miles)_did_you_drive_in_the_last_12_months.html)
-"About how many kilometers (miles) did you drive in the last 12 months?"
 
 ## Contact
 If you have any questions or suggestions, feel free to reach out to md_shadab_alam@outlook.com or pavlo.bazilinskyy@gmail.com.
