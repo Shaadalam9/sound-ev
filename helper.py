@@ -505,10 +505,12 @@ class HMD_helper:
                 name = key
             # smoothen signal
             if self.smoothen_signal:
-                pass
                 if isinstance(values, pd.Series):
                     values = values.tolist()
                     values = self.smoothen_filter(values)
+                
+            # convert to 0-100%
+            values = [v * 100 for v in values]
 
             all_values.extend(values)  # type: ignore # collect values for y-axis tick range
 
@@ -557,7 +559,7 @@ class HMD_helper:
         # Update y-axis with only relevant tick marks
         fig.update_yaxes(
             showgrid=True,
-            range=[actual_ymin, actual_ymax],
+            range=yaxis_range,
             tickvals=visible_ticks,  # only show ticks for data range
             tickformat='.2f',
             automargin=True,
@@ -638,12 +640,12 @@ class HMD_helper:
             fig.update_layout(barmode='stack')
 
         # legend
-        if legend_columns == 1:
+        if legend_columns == 1:  # single column
             fig.update_layout(legend=dict(x=legend_x,
                                           y=legend_y,
                                           bgcolor='rgba(0,0,0,0)',
                                           font=dict(size=font_size)))
-        elif legend_columns == 2:
+        elif legend_columns == 2:  # multiple columns
             fig.update_layout(
                 legend=dict(
                     x=legend_x,
@@ -1021,13 +1023,15 @@ class HMD_helper:
                     if "Timestamp" not in df or column_name not in df:
                         continue
 
-                    # Round timestamps to given resolution
-                    df["Timestamp"] = ((df["Timestamp"] / resolution).round() * resolution).astype(float)
-                    df["Timestamp"] = df["Timestamp"].round(2)
+                    # Bin timestamps to resolution
+                    df["Timestamp"] = ((df["Timestamp"] / resolution).round() * resolution).round(2)
+
+                    # Group by timestamp and compute average of target column
+                    grouped = df.groupby("Timestamp", as_index=True)[column_name].mean()
 
                     # Store trigger values
-                    participant_matrix[f"P{participant_id}"] = dict(zip(df["Timestamp"], df[column_name]))
-                    all_timestamps.update(df["Timestamp"])
+                    participant_matrix[f"P{participant_id}"] = grouped.to_dict()
+                    all_timestamps.update(grouped.index)
                     break
 
         # Get aligned timestamps based on video length from mapping
@@ -1037,8 +1041,8 @@ class HMD_helper:
             all_timestamps = np.round(np.arange(resolution, video_length_sec + resolution, resolution), 2).tolist()
 
             # Save timestamps
-            ts_output_path = output_file.replace(".csv", "_timestamps.csv")
-            pd.DataFrame({"Timestamp": all_timestamps}).to_csv(ts_output_path, index=False)
+            # ts_output_path = output_file.replace(".csv", "_timestamps.csv")
+            # pd.DataFrame({"Timestamp": all_timestamps}).to_csv(ts_output_path, index=False)
         else:
             logger.warning(f"Video length not found in mapping for video_id {video_id}")
 
@@ -1086,18 +1090,18 @@ class HMD_helper:
                     if not required_cols.issubset(df.columns):
                         continue
 
-                    # Normalize timestamps
-                    df["Timestamp"] = ((df["Timestamp"] / resolution).round() * resolution).astype(float)
-                    df["Timestamp"] = df["Timestamp"].round(2)
+                    # Bin timestamps to resolution
+                    df["Timestamp"] = ((df["Timestamp"] / resolution).round() * resolution).round(2)
 
-                    # Group by timestamp and compute yaw
-                    yaw_by_time = df.groupby("Timestamp")[["HMDRotationW",
-                                                           "HMDRotationX",
-                                                           "HMDRotationY",
-                                                           "HMDRotationZ"]].apply(
-                        lambda group: HMD_class.quaternion_to_euler(*HMD_class.average_quaternions_eigen(group.values))[2]  # noqa: E501
-                    ).reset_index(name="Yaw")
+                    # Group quaternions by timestamp and compute average quaternion → yaw
+                    yaw_by_time = (
+                        df.groupby("Timestamp")[["HMDRotationW", "HMDRotationX", "HMDRotationY", "HMDRotationZ"]]
+                          .apply(lambda group: HMD_class.quaternion_to_euler(
+                              *HMD_class.average_quaternions_eigen(group.values)
+                          )[2]).reset_index(name="Yaw")  
+                    )
 
+                    # Store yaw values
                     participant_matrix[f"P{participant_id}"] = dict(zip(yaw_by_time["Timestamp"], yaw_by_time["Yaw"]))
                     all_timestamps.update(yaw_by_time["Timestamp"])
                     break
@@ -1597,8 +1601,8 @@ class HMD_helper:
                          width=1600,
                          save_final=True)
 
-    def plot_yaw_angle_histograms(self, mapping, angle=180, data_folder='_output', num_bins=None,
-                                  smoothen_filter_param=False, calibrate=False):
+    def plot_yaw_histogram(self, mapping, angle=180, data_folder='_output', num_bins=None,
+                           smoothen_filter_param=False, calibrate=False):
         """
         Plots histogram of average yaw angles across participants for each trial.
 
@@ -1674,8 +1678,9 @@ class HMD_helper:
             legend=dict(font=dict(size=20)),
             width=1400,
             height=800,
-            font=dict(size=16),
+            font=dict(size=common.get_configs('font_size'),
+                      family=common.get_configs('font_family')),
             margin=dict(t=60, b=60, l=60, r=60)
         )
 
-        self.save_plotly(fig, 'histogram', save_final=True)
+        self.save_plotly(fig, 'yaw_histogram', save_final=True)

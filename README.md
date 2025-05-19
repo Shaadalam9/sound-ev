@@ -12,7 +12,7 @@ Percentage of the participants who pressed the key (i.e. felt safe to cross in f
 [![Yaw angle](figures/all_videos_yaw_angle_Yaw.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/all_videos_yaw_angle_Yaw.html)
 Mean yaw angle of head movement of pedestrians as a function of time for each sound stimulus. The value of 0 denotes participants looking perpendicular to the road, negative values correspond to the left direction (vehicle approach) and vice versa. The vertical line represents the passing moment. The asterisks at the bottom indicate significant differences with respect to 'Diesel' sound, p < 0.05.
 
-[![Histogram of yaw angle](figures/histogram.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/histogram.html)
+[![Histogram of yaw angle](figures/yaw_histogram.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/yaw_histogram.html)
 Histogram of yaw angle of head movement of pedestrians as a function of time for each sound stimulus. The value of 0 denotes participants looking perpendicular to the road, negative values correspond to the left direction (vehicle approach) and vice versa.
 
 ## Subjective responses
