@@ -424,7 +424,7 @@ class HMD_helper:
                 anova_marker_size=3, anova_marker_colour='black', anova_annotations_font_size=10,
                 anova_annotations_colour='black', ttest_anova_row_height=0.5, xaxis_step=5,
                 yaxis_step=5, y_legend_bar=None, line_width=1, bar_font_size=None,
-                custom_line_colors=None, flag_multiply=False):
+                custom_line_colors=None, flag_multiply=False, margin=None):
         """
         Plot keypresses.
 
@@ -477,6 +477,7 @@ class HMD_helper:
             y_legend_bar (list, optional): Names for variables in bar data for legend.
             line_width (int): Line width for keypress data plot.
         """
+        # todo: update docstrings in all methods
 
         logger.info('Creating keypress figure.')
         # calculate times
@@ -674,7 +675,8 @@ class HMD_helper:
             )
 
         # adjust margins because of hardcoded ylim axis
-        fig.update_layout(margin=dict(l=80, r=2, t=12, b=12))
+        if margin:
+            fig.update_layout(margin=margin)
 
         # update font family
         if font_family:
@@ -1139,7 +1141,7 @@ class HMD_helper:
         combined_df.to_csv(output_file, index=False)
 
     def plot_column(self, mapping, column_name="TriggerValueRight", xaxis_title=None, yaxis_title=None,
-                    xaxis_range=None, yaxis_range=None):
+                    xaxis_range=None, yaxis_range=None, margin=None):
         """
         Generate a comparison plot of keypress data and subjective slider ratings
         across different video trials relative to a test condition.
@@ -1257,10 +1259,11 @@ class HMD_helper:
             save_file=True,
             save_final=True,
             custom_line_colors=[color_dict.get(label, None) for label in all_labels],
-            flag_multiply=True
+            flag_multiply=True,
+            margin=margin
         )
 
-    def plot_yaw(self, mapping, column_name="Yaw"):
+    def plot_yaw(self, mapping, column_name="Yaw", margin=None):
         """
         Generate a comparison plot of keypress data and subjective slider ratings
         across different video trials relative to a test condition.
@@ -1350,7 +1353,7 @@ class HMD_helper:
             yaxis_range=[0.03, 0.12],
             xaxis_title="Time, [s]",
             yaxis_title="Yaw angle, [radian]",
-            xaxis_title_offset=-0.065,  # type: ignore
+            xaxis_title_offset=-0.047,  # type: ignore
             yaxis_title_offset=0.17,  # type: ignore
             name_file=f"all_videos_yaw_angle_{column_name}",
             show_text_labels=True,
@@ -1362,8 +1365,8 @@ class HMD_helper:
             ttest_signals=ttest_signals,
             ttest_anova_row_height=0.01,
             ttest_annotations_font_size=common.get_configs("font_size") - 6,
-            ttest_annotation_x=11,  # type: ignore
-            ttest_marker_size=18,
+            ttest_annotation_x=0.8,  # type: ignore
+            ttest_marker_size=common.get_configs("font_size") - 4,
             xaxis_step=1,
             yaxis_step=0.03,  # type: ignore
             legend_x=0,
@@ -1376,6 +1379,7 @@ class HMD_helper:
             save_file=True,
             save_final=True,
             custom_line_colors=[color_dict.get(label, None) for label in all_labels],
+            margin=margin
         )
 
     def plot_individual_csvs(self, csv_paths, mapping_df, font_size=None, color_dict=None):
@@ -1439,7 +1443,7 @@ class HMD_helper:
 
         # Define subplot layout and titles
         subplot_titles = ['Noticeability', 'Informativeness', 'Annoyance', 'Composite score']
-        fig = make_subplots(rows=2, cols=2, subplot_titles=subplot_titles, vertical_spacing=0.3)
+        fig = make_subplots(rows=2, cols=2, subplot_titles=subplot_titles, vertical_spacing=0.25)
 
         # Set subplot title font sizes
         for annotation in fig['layout']['annotations']:  # type: ignore
@@ -1476,7 +1480,7 @@ class HMD_helper:
             font=dict(size=font_size or common.get_configs('font_size'), family=common.get_configs('font_family')),
             height=1300,
             width=1600,
-            margin=dict(t=80, b=100, l=40, r=40),
+            margin=dict(t=25, b=100, l=40, r=40),
             showlegend=False
         )
         fig.update_xaxes(tickangle=45)

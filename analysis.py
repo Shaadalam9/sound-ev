@@ -64,27 +64,28 @@ except Exception as e:
 if __name__ == "__main__":
     logger.info("Analysis started.")
     # Read and process data
-    # HMD.read_slider_data(data_folder, mapping, output_folder)
-    # HMD.avg_csv_files(data_folder, mapping)
+    HMD.read_slider_data(data_folder, mapping, output_folder)
+    HMD.avg_csv_files(data_folder, mapping)
     # Keypress data
     HMD.plot_column(mapping,
                     column_name="TriggerValueRight",
                     xaxis_range=[0, 11],
                     yaxis_range=[0, 100],
                     xaxis_title="Time, [s]",
-                    yaxis_title="Percentage of trials with trigger key pressed")
-    # # Head rotation
-    # HMD.plot_yaw(mapping)
+                    yaxis_title="Percentage of trials with trigger key pressed",
+                    margin=dict(l=80, r=2, t=12, b=12))
+    # Head rotation
+    HMD.plot_yaw(mapping, margin=dict(l=100, r=2, t=12, b=12))
     # HMD.plot_yaw_histogram(mapping, angle=10, num_bins=30, calibrate=False, smoothen_filter_param=False)
-    # # Subjective responses
-    # HMD.plot_individual_csvs(["_output/slider_input_noticeability.csv",
-    #                           "_output/slider_input_info.csv",
-    #                           "_output/slider_input_annoyance.csv"
-    #                           ], mapping)
-    # HMD.plot_individual_csvs_barplot(["_output/slider_input_noticeability.csv",
-    #                                   "_output/slider_input_info.csv",
-    #                                   "_output/slider_input_annoyance.csv"
-    #                                   ], mapping)
+    # Subjective responses
+    HMD.plot_individual_csvs(["_output/slider_input_noticeability.csv",
+                              "_output/slider_input_info.csv",
+                              "_output/slider_input_annoyance.csv"
+                              ], mapping)
+    HMD.plot_individual_csvs_barplot(["_output/slider_input_noticeability.csv",
+                                      "_output/slider_input_info.csv",
+                                      "_output/slider_input_annoyance.csv"
+                                      ], mapping)
     # # Information on participants
     # HMD.plot_column_distribution(intake_questionnaire,
     #                              intake_columns_to_plot,
