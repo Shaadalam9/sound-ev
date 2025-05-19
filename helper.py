@@ -508,7 +508,7 @@ class HMD_helper:
                 if isinstance(values, pd.Series):
                     values = values.tolist()
                     values = self.smoothen_filter(values)
-                
+
             # convert to 0-100%
             values = [v * 100 for v in values]
 
@@ -556,12 +556,20 @@ class HMD_helper:
         # Combine and sort ticks
         visible_ticks = np.sort(np.unique(np.concatenate((negative_ticks, positive_ticks))))
 
+        # Check if all tick values are effectively integers
+        if all(float(tick).is_integer() for tick in visible_ticks):
+            tick_format = ',d'  # integer formatting
+        else:
+            tick_format = '.2f'  # float with 2 decimals
+
+        print(tick_format)
+
         # Update y-axis with only relevant tick marks
         fig.update_yaxes(
             showgrid=True,
             range=yaxis_range,
             tickvals=visible_ticks,  # only show ticks for data range
-            tickformat='.2f',
+            tickformat=tick_format,
             automargin=True,
             title=dict(
                         text="",
@@ -1215,12 +1223,11 @@ class HMD_helper:
             df=combined_df,
             y=all_labels,
             y_legend_kp=all_labels,
-            xaxis_range=xaxis_range,
-            yaxis_range=yaxis_range,
+            yaxis_range=[0, 100],
+            xaxis_range=[0, 11],
             xaxis_title=xaxis_title,  # type: ignore
             xaxis_title_offset=-0.055,  # type: ignore
             yaxis_title_offset=0.18,  # type: ignore
-            yaxis_title=yaxis_title,  # type: ignore
             name_file=f"all_videos_kp_slider_plot_{column_name}",
             show_text_labels=True,
             pretty_text=True,
@@ -1229,7 +1236,7 @@ class HMD_helper:
             events_annotations_font_size=common.get_configs("font_size") - 6,
             stacked=False,
             ttest_signals=ttest_signals,
-            ttest_anova_row_height=0.03,
+            ttest_anova_row_height=3,
             ttest_annotations_font_size=common.get_configs("font_size") - 6,
             ttest_annotation_x=1.1,  # type: ignore
             ttest_marker='circle',
@@ -1238,7 +1245,7 @@ class HMD_helper:
             legend_y=1.225,
             legend_columns=2,
             xaxis_step=1,
-            yaxis_step=0.20,  # type: ignore
+            yaxis_step=20,  # type: ignore
             line_width=3,
             font_size=common.get_configs("font_size"),
             fig_save_width=1800,
