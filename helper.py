@@ -424,7 +424,7 @@ class HMD_helper:
                 anova_marker_size=3, anova_marker_colour='black', anova_annotations_font_size=10,
                 anova_annotations_colour='black', ttest_anova_row_height=0.5, xaxis_step=5,
                 yaxis_step=5, y_legend_bar=None, line_width=1, bar_font_size=None,
-                custom_line_colors=None):
+                custom_line_colors=None, flag_multiply=False):
         """
         Plot keypresses.
 
@@ -483,10 +483,12 @@ class HMD_helper:
         times = df['Timestamp'].values
         # plotly
         fig = go.Figure()
+
         # adjust ylim, if ttest results need to be plotted
         if ttest_signals:
-            # assume one row takes ttest_anova_row_height on y axis
-            yaxis_range[0] = (yaxis_range[0] - len(ttest_signals) * ttest_anova_row_height - ttest_anova_row_height)  # noqa: E501  # type: ignore
+            if yaxis_range[0] != 0:  # type: ignore
+                # assume one row takes ttest_anova_row_height on y axis
+                yaxis_range[0] = (yaxis_range[0] - len(ttest_signals) * ttest_anova_row_height - ttest_anova_row_height)  # noqa: E501  # type: ignore
 
         # adjust ylim, if anova results need to be plotted
         if anova_signals:
@@ -510,7 +512,10 @@ class HMD_helper:
                     values = self.smoothen_filter(values)
 
             # convert to 0-100%
-            values = [v * 100 for v in values]
+            if flag_multiply:
+                values = [v * 100 for v in values]  # type: ignore
+            else:
+                values = [v for v in values]  # type: ignore
 
             all_values.extend(values)  # type: ignore # collect values for y-axis tick range
 
@@ -549,32 +554,28 @@ class HMD_helper:
 
         # Generate ticks from 0 up to actual_ymax
         positive_ticks = np.arange(0, actual_ymax + yaxis_step, yaxis_step)
+        formatted_positive_ticks = [int(tick) if tick.is_integer() else tick for tick in positive_ticks]
 
         # Generate ticks from 0 down to actual_ymin (note: ymin is negative)
         negative_ticks = np.arange(0, actual_ymin - yaxis_step, -yaxis_step)
+        formatted_negative_ticks = [int(tick) if tick.is_integer() else tick for tick in negative_ticks]
 
         # Combine and sort ticks
-        visible_ticks = np.sort(np.unique(np.concatenate((negative_ticks, positive_ticks))))
+        visible_ticks = np.sort(np.unique(np.concatenate((formatted_negative_ticks, formatted_positive_ticks))))
 
-        # Check if all tick values are effectively integers
-        if all(float(tick).is_integer() for tick in visible_ticks):
-            tick_format = ',d'  # integer formatting
-        else:
-            tick_format = '.2f'  # float with 2 decimals
-
-        print(tick_format)
+        tick_labels = [str(int(t)) if t.is_integer() else f"{t:.2f}" for t in visible_ticks]
 
         # Update y-axis with only relevant tick marks
         fig.update_yaxes(
             showgrid=True,
             range=yaxis_range,
             tickvals=visible_ticks,  # only show ticks for data range
-            tickformat=tick_format,
+            ticktext=tick_labels,
             automargin=True,
             title=dict(
                         text="",
                         # font=dict(size=font_size or common.get_configs('font_size')),
-                        standoff=40
+                        standoff=0
             )
         )
 
@@ -755,15 +756,16 @@ class HMD_helper:
                             xs.append(times[i])
                             ys.append(y_offset)
                     # plot markers
-                    fig.add_trace(go.Scatter(x=xs,
-                                             y=ys,
-                                             mode='markers',
-                                             marker=dict(symbol=ttest_marker,
-                                                         size=ttest_marker_size,
-                                                         color=ttest_marker_colour),
-                                             text=p_vals,
-                                             showlegend=False,
-                                             hovertemplate=f"{comp['label']}: time=%{{x}}, p=%{{text}}"))
+                    for x, y, p_val in zip(xs, ys, p_vals):
+                        fig.add_annotation(
+                            x=x,
+                            y=y,
+                            text='*',
+                            showarrow=False,
+                            font=dict(size=ttest_marker_size, color=ttest_marker_colour),
+                            hovertext=f"{comp['label']}: time={x}, p={p_val}",
+                            hoverlabel=dict(bgcolor="white"),
+                        )
                     # label row
                     fig.add_annotation(x=ttest_annotation_x,
                                        y=y_offset,
@@ -1236,11 +1238,10 @@ class HMD_helper:
             events_annotations_font_size=common.get_configs("font_size") - 6,
             stacked=False,
             ttest_signals=ttest_signals,
-            ttest_anova_row_height=3,
+            ttest_anova_row_height=4,
             ttest_annotations_font_size=common.get_configs("font_size") - 6,
             ttest_annotation_x=1.1,  # type: ignore
-            ttest_marker='circle',
-            ttest_marker_size=8,
+            ttest_marker_size=18,
             legend_x=0,
             legend_y=1.225,
             legend_columns=2,
@@ -1252,7 +1253,8 @@ class HMD_helper:
             fig_save_height=900,
             save_file=True,
             save_final=True,
-            custom_line_colors=[color_dict.get(label, None) for label in all_labels]
+            custom_line_colors=[color_dict.get(label, None) for label in all_labels],
+            flag_multiply=True
         )
 
     def plot_yaw(self, mapping, column_name="Yaw"):
@@ -1358,8 +1360,7 @@ class HMD_helper:
             ttest_anova_row_height=0.01,
             ttest_annotations_font_size=common.get_configs("font_size") - 6,
             ttest_annotation_x=11,  # type: ignore
-            ttest_marker='circle',
-            ttest_marker_size=8,
+            ttest_marker_size=18,
             xaxis_step=1,
             yaxis_step=0.03,  # type: ignore
             legend_x=0,
@@ -1438,8 +1439,9 @@ class HMD_helper:
         fig = make_subplots(rows=2, cols=2, subplot_titles=subplot_titles, vertical_spacing=0.3)
 
         # Set subplot title font sizes
-        for annotation in fig['layout']['annotations']:
-            annotation['font'] = dict(size=font_size or common.get_configs('font_size'))
+        for annotation in fig['layout']['annotations']:  # type: ignore
+            annotation['font'] = dict(size=font_size or common.get_configs('font_size'),  # type: ignore
+                                      family=common.get_configs('font_family'))
 
         # Assign colors from color_dict
         all_colors = [color_dict.get(label, None) for label in sorted_display_names]
@@ -1468,7 +1470,7 @@ class HMD_helper:
 
         # Layout settings
         fig.update_layout(
-            font=dict(size=font_size or common.get_configs('font_size')),
+            font=dict(size=font_size or common.get_configs('font_size'), family=common.get_configs('font_family')),
             height=1300,
             width=1600,
             margin=dict(t=80, b=100, l=40, r=40),
@@ -1549,8 +1551,9 @@ class HMD_helper:
         subplot_titles = ['Noticeability', 'Informativeness', 'Annoyance', 'Composite score']
         fig = make_subplots(rows=2, cols=2, subplot_titles=subplot_titles, vertical_spacing=0.3)
         # Make subplot titles larger
-        for annotation in fig['layout']['annotations']:
-            annotation['font'] = dict(size=font_size or common.get_configs('font_size'))
+        for annotation in fig['layout']['annotations']:  # type: ignore
+            annotation['font'] = dict(size=font_size or common.get_configs('font_size'),  # type: ignore
+                                      family=common.get_configs('font_family'))
 
         data_to_plot = [
             (avgs[0], stds[0]),
@@ -1594,7 +1597,7 @@ class HMD_helper:
                 fig.update_yaxes(range=[0, 12], row=row, col=col)
 
         fig.update_layout(
-            font=dict(size=font_size or common.get_configs('font_size')),
+            font=dict(size=font_size or common.get_configs('font_size'), family=common.get_configs('font_family')),
             height=1200,
             width=1600,
             margin=dict(t=20, b=120, l=40, r=40),

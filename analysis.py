@@ -75,7 +75,7 @@ if __name__ == "__main__":
                     xaxis_title="Time, [s]",
                     yaxis_title="Percentage of trial with response key pressed")
     # Head rotation
-    # HMD.plot_yaw(mapping)
+    HMD.plot_yaw(mapping)
     # HMD.plot_yaw_histogram(mapping, angle=10, num_bins=30, calibrate=False, smoothen_filter_param=False)
     # Subjective responses
     # HMD.plot_individual_csvs(["_output/slider_input_noticeability.csv",
