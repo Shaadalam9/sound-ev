@@ -70,14 +70,13 @@ if __name__ == "__main__":
     HMD.plot_column(mapping,
                     column_name="TriggerValueRight",
                     xaxis_range=[0, 11],
-                    yaxis_range=[0.45, 1],
-                    # todo: yaxis_range=[0, 100],
+                    yaxis_range=[0, 100],
                     xaxis_title="Time, [s]",
-                    yaxis_title="Percentage of trial with response key pressed")
-    # Head rotation
-    HMD.plot_yaw(mapping)
+                    yaxis_title="Percentage of trials with trigger key pressed")
+    # # Head rotation
+    # HMD.plot_yaw(mapping)
     # HMD.plot_yaw_histogram(mapping, angle=10, num_bins=30, calibrate=False, smoothen_filter_param=False)
-    # Subjective responses
+    # # Subjective responses
     # HMD.plot_individual_csvs(["_output/slider_input_noticeability.csv",
     #                           "_output/slider_input_info.csv",
     #                           "_output/slider_input_annoyance.csv"
@@ -86,7 +85,7 @@ if __name__ == "__main__":
     #                                   "_output/slider_input_info.csv",
     #                                   "_output/slider_input_annoyance.csv"
     #                                   ], mapping)
-    # Information on participants
+    # # Information on participants
     # HMD.plot_column_distribution(intake_questionnaire,
     #                              intake_columns_to_plot,
     #                              output_folder="output",

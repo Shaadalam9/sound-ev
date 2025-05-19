@@ -673,6 +673,9 @@ class HMD_helper:
                 legend_itemdoubleclick='toggle',
             )
 
+        # adjust margins because of hardcoded ylim axis
+        fig.update_layout(margin=dict(l=80, r=2, t=12, b=12))
+
         # update font family
         if font_family:
             # use given value
@@ -691,7 +694,7 @@ class HMD_helper:
         if save_file:
             self.save_plotly(fig=fig,
                              name=name_file,
-                             remove_margins=True,
+                             remove_margins=False,
                              width=fig_save_width,
                              height=fig_save_height,
                              save_final=save_final)  # also save as "final" figure
@@ -1225,10 +1228,10 @@ class HMD_helper:
             df=combined_df,
             y=all_labels,
             y_legend_kp=all_labels,
-            yaxis_range=[0, 100],
-            xaxis_range=[0, 11],
+            yaxis_range=yaxis_range,
+            xaxis_range=xaxis_range,
             xaxis_title=xaxis_title,  # type: ignore
-            xaxis_title_offset=-0.055,  # type: ignore
+            xaxis_title_offset=-0.04,  # type: ignore
             yaxis_title_offset=0.18,  # type: ignore
             name_file=f"all_videos_kp_slider_plot_{column_name}",
             show_text_labels=True,
@@ -1241,7 +1244,7 @@ class HMD_helper:
             ttest_anova_row_height=4,
             ttest_annotations_font_size=common.get_configs("font_size") - 6,
             ttest_annotation_x=1.1,  # type: ignore
-            ttest_marker_size=18,
+            ttest_marker_size=common.get_configs("font_size") - 4,
             legend_x=0,
             legend_y=1.225,
             legend_columns=2,
