@@ -720,6 +720,9 @@ class HMD_helper:
         counter_ttest = 0
         counter_anova = 0
 
+        # calculate resolution based on the param in
+        resolution = common.get_configs("kp_resolution") / 1000.0
+
         # --- t-test markers ---
         if ttest_signals:
             for comp in ttest_signals:
@@ -728,7 +731,8 @@ class HMD_helper:
                 )  # type: ignore
 
                 # Save csv
-                times_csv = [round(i * 0.02, 2) for i in range(len(comp['signal_1']))]
+                # todo: rounding to 2 is hardcoded and wrong?
+                times_csv = [round(i * resolution, 2) for i in range(len(comp['signal_1']))]
                 self.save_stats_csv(t=times_csv,
                                     p_values=p_vals,
                                     name_file=f"{comp['label']}_{name_file}.csv")
@@ -911,6 +915,9 @@ class HMD_helper:
         # Group file paths by video_id using a helper function
         grouped_data = HMD_class.group_files_by_video_id(data_folder, mapping)
 
+        # calculate resolution based on the param in
+        resolution = common.get_configs("kp_resolution") / 1000.0
+
         # Process each video ID and its associated files
         logger.info("Exporting CSV files.")
         for video_id, file_locations in tqdm(grouped_data.items()):
@@ -929,10 +936,11 @@ class HMD_helper:
                 df = pd.read_csv(file_location)
 
                 # Filter the DataFrame to only include rows where Timestamp >= 0 and <= video_length
+                # todo: 0.01 hardcoded value does not work?
                 df = df[(df["Timestamp"] >= 0) & (df["Timestamp"] <= video_length + 0.01)]
 
-                # Round the Timestamp to the nearest multiple of 0.02
-                df["Timestamp"] = ((df["Timestamp"] / 0.02).round() * 0.02).astype(float)
+                # Round the Timestamp to the nearest multiple of resolution
+                df["Timestamp"] = ((df["Timestamp"] / resolution).round() * resolution).astype(float)
 
                 all_dfs.append(df)
 
@@ -992,6 +1000,9 @@ class HMD_helper:
         participant_matrix = {}
         all_timestamps = set()
 
+        # calculate resolution based on the param in
+        resolution = common.get_configs("kp_resolution") / 1000.0
+
         for folder in sorted(os.listdir(data_folder)):
             folder_path = os.path.join(data_folder, folder)
             if not os.path.isdir(folder_path):
@@ -1010,8 +1021,8 @@ class HMD_helper:
                     if "Timestamp" not in df or column_name not in df:
                         continue
 
-                    # Round timestamps to 0.02s resolution
-                    df["Timestamp"] = ((df["Timestamp"] / 0.02).round() * 0.02).astype(float)
+                    # Round timestamps to given resolution
+                    df["Timestamp"] = ((df["Timestamp"] / resolution).round() * resolution).astype(float)
                     df["Timestamp"] = df["Timestamp"].round(2)
 
                     # Store trigger values
@@ -1023,7 +1034,7 @@ class HMD_helper:
         video_length_row = mapping.loc[mapping["video_id"] == video_id, "video_length"]
         if not video_length_row.empty:
             video_length_sec = video_length_row.values[0] / 1000  # convert ms to sec
-            all_timestamps = np.round(np.arange(0.02, video_length_sec + 0.02, 0.02), 2).tolist()
+            all_timestamps = np.round(np.arange(resolution, video_length_sec + resolution, resolution), 2).tolist()
 
             # Save timestamps
             ts_output_path = output_file.replace(".csv", "_timestamps.csv")
@@ -1053,6 +1064,9 @@ class HMD_helper:
         participant_matrix = {}
         all_timestamps = set()
 
+        # calculate resolution based on the param in
+        resolution = common.get_configs("kp_resolution") / 1000.0
+
         for folder in sorted(os.listdir(data_folder)):
             folder_path = os.path.join(data_folder, folder)
             if not os.path.isdir(folder_path):
@@ -1073,7 +1087,7 @@ class HMD_helper:
                         continue
 
                     # Normalize timestamps
-                    df["Timestamp"] = ((df["Timestamp"] / 0.02).round() * 0.02).astype(float)
+                    df["Timestamp"] = ((df["Timestamp"] / resolution).round() * resolution).astype(float)
                     df["Timestamp"] = df["Timestamp"].round(2)
 
                     # Group by timestamp and compute yaw
@@ -1092,7 +1106,7 @@ class HMD_helper:
         video_length_row = mapping.loc[mapping["video_id"] == video_id, "video_length"]
         if not video_length_row.empty:
             video_length_sec = video_length_row.values[0] / 1000  # convert ms to sec
-            all_timestamps = np.round(np.arange(0.02, video_length_sec + 0.02, 0.02), 2).tolist()
+            all_timestamps = np.round(np.arange(resolution, video_length_sec + resolution, resolution), 2).tolist()
 
             # Save timestamps
             ts_output_path = output_file.replace(".csv", "_timestamps.csv")
@@ -1213,9 +1227,9 @@ class HMD_helper:
             ttest_signals=ttest_signals,
             ttest_anova_row_height=0.03,
             ttest_annotations_font_size=common.get_configs("font_size") - 6,
-            ttest_annotation_x=1.2,  # type: ignore
+            ttest_annotation_x=1.1,  # type: ignore
             ttest_marker='circle',
-            ttest_marker_size=4,
+            ttest_marker_size=8,
             legend_x=0,
             legend_y=1.225,
             legend_columns=2,
@@ -1318,7 +1332,8 @@ class HMD_helper:
             y_legend_kp=all_labels,
             xaxis_range=[0, 11],
             yaxis_range=[0.03, 0.12],
-            yaxis_title="Yaw angle (radian)",
+            xaxis_title="Time, [s]",
+            yaxis_title="Yaw angle, [radian]",
             xaxis_title_offset=-0.065,  # type: ignore
             yaxis_title_offset=0.17,  # type: ignore
             name_file=f"all_videos_yaw_angle_{column_name}",
@@ -1331,9 +1346,9 @@ class HMD_helper:
             ttest_signals=ttest_signals,
             ttest_anova_row_height=0.01,
             ttest_annotations_font_size=common.get_configs("font_size") - 6,
-            ttest_annotation_x=1.7,  # type: ignore
+            ttest_annotation_x=11,  # type: ignore
             ttest_marker='circle',
-            ttest_marker_size=4,
+            ttest_marker_size=8,
             xaxis_step=1,
             yaxis_step=0.03,  # type: ignore
             legend_x=0,
@@ -1409,7 +1424,7 @@ class HMD_helper:
 
         # Define subplot layout and titles
         subplot_titles = ['Noticeability', 'Informativeness', 'Annoyance', 'Composite score']
-        fig = make_subplots(rows=2, cols=2, subplot_titles=subplot_titles, vertical_spacing=0.25)
+        fig = make_subplots(rows=2, cols=2, subplot_titles=subplot_titles, vertical_spacing=0.3)
 
         # Set subplot title font sizes
         for annotation in fig['layout']['annotations']:
@@ -1569,7 +1584,7 @@ class HMD_helper:
 
         fig.update_layout(
             font=dict(size=font_size or common.get_configs('font_size')),
-            height=1000,
+            height=1200,
             width=1600,
             margin=dict(t=20, b=120, l=40, r=40),
             showlegend=False
@@ -1578,7 +1593,7 @@ class HMD_helper:
         fig.update_xaxes(tickangle=45)
         self.save_plotly(fig,
                          'bar_response',
-                         height=1000,
+                         height=1200,
                          width=1600,
                          save_final=True)
 
