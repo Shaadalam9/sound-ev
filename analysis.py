@@ -63,9 +63,11 @@ except Exception as e:
 # Execute analysis
 if __name__ == "__main__":
     logger.info("Analysis started.")
+
     # Read and process data
     HMD.read_slider_data(data_folder, mapping, output_folder)
     HMD.avg_csv_files(data_folder, mapping)
+
     # Keypress data
     HMD.plot_column(mapping,
                     column_name="TriggerValueRight",
@@ -74,9 +76,11 @@ if __name__ == "__main__":
                     xaxis_title="Time, [s]",
                     yaxis_title="Percentage of trials with trigger key pressed",
                     margin=dict(l=80, r=2, t=12, b=12))
+
     # Head rotation
     HMD.plot_yaw(mapping, margin=dict(l=100, r=2, t=12, b=12))
-    # HMD.plot_yaw_histogram(mapping, angle=10, num_bins=30, calibrate=False, smoothen_filter_param=False)
+    HMD.plot_yaw_histogram(mapping, angle=10, num_bins=30, calibrate=False, smoothen_filter_param=False)
+
     # Subjective responses
     HMD.plot_individual_csvs(["_output/slider_input_noticeability.csv",
                               "_output/slider_input_info.csv",
@@ -86,20 +90,21 @@ if __name__ == "__main__":
                                       "_output/slider_input_info.csv",
                                       "_output/slider_input_annoyance.csv"
                                       ], mapping)
-    # # Information on participants
-    # HMD.plot_column_distribution(intake_questionnaire,
-    #                              intake_columns_to_plot,
-    #                              output_folder="output",
-    #                              save_file=True)
-    # HMD.plot_column_distribution(post_experiment_questionnaire,
-    #                              post_columns_to_plot,
-    #                              output_folder="output",
-    #                              save_file=True)
-    # HMD.distribution_plots(intake_questionnaire,
-    #                        intake_columns_distribution_to_plot,
-    #                        output_folder="output",
-    #                        save_file=True)
-    # HMD.distribution_plots(post_experiment_questionnaire,
-    #                        post_columns_distribution_to_plot,
-    #                        output_folder="output",
-    #                        save_file=True)
+
+    # Information on participants
+    HMD.plot_column_distribution(intake_questionnaire,
+                                 intake_columns_to_plot,
+                                 output_folder="output",
+                                 save_file=True)
+    HMD.plot_column_distribution(post_experiment_questionnaire,
+                                 post_columns_to_plot,
+                                 output_folder="output",
+                                 save_file=True)
+    HMD.distribution_plots(intake_questionnaire,
+                           intake_columns_distribution_to_plot,
+                           output_folder="output",
+                           save_file=True)
+    HMD.distribution_plots(post_experiment_questionnaire,
+                           post_columns_distribution_to_plot,
+                           output_folder="output",
+                           save_file=True)
