@@ -11,11 +11,10 @@ import common
 from custom_logger import CustomLogger
 import re
 import numpy as np
-from scipy.stats import ttest_rel, ttest_ind, f_oneway
-from statsmodels.stats.anova import anova_lm
-from statsmodels.formula.api import ols
+from scipy.stats import ttest_rel, ttest_ind
 from scipy.stats import zscore
 from utils.HMD import HMD_yaw
+from utils.extra import Tools
 from tqdm import tqdm
 
 
@@ -23,6 +22,7 @@ logger = CustomLogger(__name__)  # use custom logger
 template = common.get_configs("plotly_template")
 
 HMD_class = HMD_yaw()
+extra_class = Tools()
 
 # Consts
 SAVE_PNG = True
@@ -58,125 +58,6 @@ class HMD_helper:
         else:
             logger.error('Specified filter {} not implemented.', type_flter)
             return -1
-
-    def ttest(self, signal_1, signal_2, type='two-sided', paired=True):
-        """
-        Perform a t-test on two signals, computing p-values and significance.
-
-        Args:
-            signal_1 (list): First signal, a list of numeric values.
-            signal_2 (list): Second signal, a list of numeric values.
-            type (str, optional): Type of t-test to perform. Options are "two-sided",
-                                  "greater", or "less". Defaults to "two-sided".
-            paired (bool, optional): Indicates whether to perform a paired t-test
-                                     (ttest_rel) or an independent t-test (ttest_ind).
-                                     Defaults to True (paired).
-
-        Returns:
-            list: A list containing two elements:
-                  - p_values (list): Raw p-values for each bin.
-                  - significance (list): Binary flags (0 or 1) indicating whether
-                    the p-value for each bin is below the threshold configured in
-                    tr.common.get_configs('p_value').
-        """
-        # Check if the lengths of the two signals are the same
-        if len(signal_1) != len(signal_2):
-            logger.error('The lengths of signal_1 and signal_2 must be the same.')
-            return -1
-
-        p_values = []
-        significance = []
-        threshold = common.get_configs("p_value")
-
-        for i in range(len(signal_1)):
-            data1 = signal_1[i]
-            data2 = signal_2[i]
-
-            # Skip if data is empty
-            if not data1 or not data2 or len(data1) != len(data2) and paired:
-                p_values.append(1.0)
-                significance.append(0)
-                continue
-
-            try:
-                if paired:
-                    t_stat, p_val = ttest_rel(data1, data2, alternative=type)
-                else:
-                    t_stat, p_val = ttest_ind(data1, data2, equal_var=False, alternative=type)
-            except Exception as e:
-                logger.warning(f"Skipping t-test at time index {i} due to error: {e}")
-                p_val = 1.0
-
-            p_values.append(p_val)
-            significance.append(int(p_val < threshold))
-
-        return [p_values, significance]
-
-    def anova(self, signals):
-        """
-        Perform an ANOVA test on three signals, computing p-values and significance.
-
-        Args:
-            signal_1 (list): First signal, a list of numeric values.
-            signal_2 (list): Second signal, a list of numeric values.
-            signal_3 (list): Third signal, a list of numeric values.
-
-        Returns:
-            list: A list containing two elements:
-                  - p_values (list): Raw p-values for each bin.
-                  - significance (list): Binary flags (0 or 1) indicating whether
-                    the p-value for each bin is below the threshold configured in
-                    tr.common.get_configs('p_value').
-        """
-        # check if the lengths of the three signals are the same
-        # convert signals to numpy arrays if they are lists
-        p_values = []  # record raw p-values for each bin
-        significance = []  # record binary flags (0 or 1) if p-value < tr.common.get_configs('p_value')
-        # perform ANOVA test for each value (treated as an independent bin)
-        transposed_data = list(zip(*signals['signals']))
-        for i in range(len(transposed_data)):
-            f_stat, p_value = f_oneway(*transposed_data[i])
-            # record raw p-value
-            p_values.append(p_value)
-            # determine significance for this value
-            significance.append(int(p_value < common.get_configs('p_value')))
-        # return raw p-values and binary flags for significance for output
-        return [p_values, significance]
-
-    def twoway_anova_kp(self, signal1, signal2, signal3, output_console=True, label_str=None):
-        """Perform twoway ANOVA on 2 independent variables and 1 dependent variable (as list of lists).
-
-        Args:
-            signal1 (list): independent variable 1.
-            signal2 (list): independent variable 2.
-            signal3 (list of lists): dependent variable 1 (keypress data).
-            output_console (bool, optional): whether to print results to console.
-            label_str (str, optional): label to add before console output.
-
-        Returns:
-            df: results of ANOVA
-        """
-        # prepare signal1 and signal2 to be of the same dimensions as signal3
-        signal3_flat = [value for sublist in signal3 for value in sublist]
-        # number of observations in the dependent variable
-        n_observations = len(signal3_flat)
-        # repeat signal1 and signal2 to match the length of signal3_flat
-        signal1_expanded = np.tile(signal1, n_observations // len(signal1))
-        signal2_expanded = np.tile(signal2, n_observations // len(signal2))
-        # create a datafarme with data
-        data = pd.DataFrame({'signal1': signal1_expanded,
-                             'signal2': signal2_expanded,
-                             'dependent': signal3_flat
-                             })
-        # perform two-way ANOVA
-        model = ols('dependent ~ C(signal1) + C(signal2) + C(signal1):C(signal2)', data=data).fit()
-        anova_results = anova_lm(model)
-        # print results to console
-        if output_console and not label_str:
-            logger.info('Results for two-way ANOVA:\n', anova_results.to_string())
-        if output_console and label_str:
-            logger.info('Results for two-way ANOVA for ' + label_str + ':\n', anova_results.to_string())
-        return anova_results
 
     def get_sound_clip_name(self, df, video_id_value):
         result = df.loc[df["video_id"] == video_id_value, "display_name"]
@@ -509,8 +390,12 @@ class HMD_helper:
             # smoothen signal
             if self.smoothen_signal:
                 if isinstance(values, pd.Series):
-                    values = values.tolist()
+                    # >>> FIX: Replace NaNs with 0 before smoothing <<<
+                    values = values.fillna(0).tolist()
                     values = self.smoothen_filter(values)
+            else:
+                # If not smoothing, ensure no NaNs anyway
+                values = values.fillna(0).tolist() if isinstance(values, pd.Series) else [v if not pd.isna(v) else 0 for v in values]  # noqa: E501
 
             # convert to 0-100%
             if flag_multiply:
@@ -548,8 +433,6 @@ class HMD_helper:
             fig.update_xaxes(title_text=xaxis_title, range=xaxis_range,
                              title_font=dict(size=font_size or common.get_configs('font_size')))
         # Find actual y range across all series
-        # actual_ymin = min([min(df[y_col]) for y_col in y])
-        # actual_ymax = max([max(df[y_col]) for y_col in y])
         actual_ymin = min(all_values)
         actual_ymax = max(all_values)
 
@@ -628,23 +511,14 @@ class HMD_helper:
                               anova_annotations_colour=anova_annotations_colour,
                               ttest_anova_row_height=ttest_anova_row_height,
                               ttest_annotation_x=ttest_annotation_x)
+
         # update template
         fig.update_layout(template=self.template)
-        # # manually add grid lines for non-negative y values only
-        # for y in np.arange(0, yaxis_range[1] + 0.01, yaxis_step):  # type: ignore
-        #     fig.add_shape(type="line",
-        #                   x0=fig.layout.xaxis.range[0] if fig.layout.xaxis.range else 0,
-        #                   x1=fig.layout.xaxis.range[1] if fig.layout.xaxis.range else 1,
-        #                   y0=y,
-        #                   y1=y,
-        #                   line=dict(color='#333333' if common.get_configs('plotly_template') == 'plotly_dark' else '#e5ecf6',  # noqa: E501
-        #                             width=1),
-        #                   xref='x',
-        #                   yref='y',
-        #                   layer='below')
+
         # format text labels
         if show_text_labels:
             fig.update_traces(texttemplate='%{text:.2f}')
+
         # stacked bar chart
         if stacked:
             fig.update_layout(barmode='stack')
@@ -655,7 +529,9 @@ class HMD_helper:
                                           y=legend_y,
                                           bgcolor='rgba(0,0,0,0)',
                                           font=dict(size=font_size)))
-        elif legend_columns == 2:  # multiple columns
+
+        # multiple columns
+        elif legend_columns == 2:
             fig.update_layout(
                 legend=dict(
                     x=legend_x,
@@ -685,6 +561,7 @@ class HMD_helper:
         else:
             # use value from config file
             fig.update_layout(font=dict(family=common.get_configs('font_family')))
+
         # update font size
         if font_size:
             # use given value
@@ -692,6 +569,7 @@ class HMD_helper:
         else:
             # use value from config file
             fig.update_layout(font=dict(size=common.get_configs('font_size')))
+
         # save file to local output folder
         if save_file:
             self.save_plotly(fig=fig,
@@ -703,6 +581,152 @@ class HMD_helper:
         # open it in localhost instead
         else:
             fig.show()
+
+    def ttest(self, signal_1, signal_2, type='two-sided', paired=True):
+        """
+        Perform a t-test on two signals, computing p-values and significance.
+
+        Args:
+            signal_1 (list): First signal, a list of numeric values.
+            signal_2 (list): Second signal, a list of numeric values.
+            type (str, optional): Type of t-test to perform. Options are "two-sided",
+                                  "greater", or "less". Defaults to "two-sided".
+            paired (bool, optional): Indicates whether to perform a paired t-test
+                                     (ttest_rel) or an independent t-test (ttest_ind).
+                                     Defaults to True (paired).
+
+        Returns:
+            list: A list containing two elements:
+                  - p_values (list): Raw p-values for each bin.
+                  - significance (list): Binary flags (0 or 1) indicating whether
+                    the p-value for each bin is below the threshold configured in
+                    tr.common.get_configs('p_value').
+        """
+        # Check if the lengths of the two signals are the same
+        if len(signal_1) != len(signal_2):
+            logger.error('The lengths of signal_1 and signal_2 must be the same.')
+            return -1
+
+        p_values = []
+        significance = []
+        threshold = common.get_configs("p_value")
+
+        for i in range(len(signal_1)):
+            data1 = signal_1[i]
+            data2 = signal_2[i]
+
+            # Skip if data is empty
+            if not data1 or not data2 or (paired and len(data1) != len(data2)):
+                p_values.append(1.0)
+                significance.append(0)
+                continue
+
+            try:
+                if paired:
+                    t_stat, p_val = ttest_rel(data1, data2, alternative=type)
+                else:
+                    t_stat, p_val = ttest_ind(data1, data2, equal_var=False, alternative=type)
+
+                # Handles the nan cases
+                if np.isnan(p_val):  # type: ignore
+                    p_val = 1.0
+            except Exception as e:
+                logger.warning(f"Skipping t-test at time index {i} due to error: {e}")
+                p_val = 1.0
+
+            p_values.append(p_val)
+            significance.append(int(p_val < threshold))
+
+        return [p_values, significance]
+
+    def avg_csv_files(self, data_folder, mapping):
+        """
+        Averages multiple CSV files corresponding to the same video ID. Each file is expected to contain
+        time-series data, including quaternion rotations and potentially other columns. The output is a
+        CSV file with averaged values for each timestamp across the files.
+
+        Parameters:
+            data_folder (str): Path to the folder containing input CSV files.
+            mapping (pd.DataFrame): A DataFrame containing metadata, including 'video_id' and 'video_length'.
+
+        Outputs:
+            For each video_id, saves an averaged DataFrame as a CSV in the output directory.
+            The output CSV is named as "<video_id>_avg_df.csv".
+        """
+
+        # Group file paths by video_id using a helper function
+        grouped_data = HMD_class.group_files_by_video_id(data_folder, mapping)
+
+        # calculate resolution based on the param in
+        resolution = common.get_configs("kp_resolution") / 1000.0
+
+        # Process each video ID and its associated files
+        logger.info("Exporting CSV files.")
+        for video_id, file_locations in tqdm(grouped_data.items()):
+            all_dfs = []
+
+            # Retrieve the video length from the mapping DataFrame
+            video_length_row = mapping.loc[mapping["video_id"] == video_id, "video_length"]
+            if video_length_row.empty:
+                logger.info(f"Video length not found for video_id: {video_id}")
+                continue
+
+            video_length = video_length_row.values[0] / 1000  # Convert milliseconds to seconds
+
+            # Read and process each file associated with the video ID
+            for file_location in file_locations:
+                df = pd.read_csv(file_location)
+
+                # Filter the DataFrame to only include rows where Timestamp >= 0 and <= video_length
+                # todo: 0.01 hardcoded value does not work?
+                df = df[(df["Timestamp"] >= 0) & (df["Timestamp"] <= video_length + 0.01)]
+
+                # Round the Timestamp to the nearest multiple of resolution
+                df["Timestamp"] = ((df["Timestamp"] / resolution).round() * resolution).astype(float)
+
+                all_dfs.append(df)
+
+            # Skip if no dataframes were collected
+            if not all_dfs:
+                continue
+
+            # Concatenate all DataFrames row-wise
+            combined_df = pd.concat(all_dfs, ignore_index=True)
+
+            # Group by 'Timestamp'
+            grouped = combined_df.groupby('Timestamp')
+
+            avg_rows = []
+            for timestamp, group in grouped:
+                row = {'Timestamp': timestamp}
+
+                # Perform SLERP-based quaternion averaging if quaternion columns are present
+                if {"HMDRotationW", "HMDRotationX", "HMDRotationY", "HMDRotationZ"}.issubset(group.columns):
+                    quats = group[["HMDRotationW", "HMDRotationX", "HMDRotationY", "HMDRotationZ"]].values.tolist()
+                    avg_quat = HMD_class.average_quaternions_eigen(quats)
+                    row.update({
+                        "HMDRotationW": avg_quat[0],
+                        "HMDRotationX": avg_quat[1],
+                        "HMDRotationY": avg_quat[2],
+                        "HMDRotationZ": avg_quat[3],
+                    })
+
+                # Average all remaining columns (excluding Timestamp and quaternion cols)
+                other_cols = [col for col in group.columns if col not in ["Timestamp",
+                                                                          "HMDRotationW",
+                                                                          "HMDRotationX",
+                                                                          "HMDRotationY",
+                                                                          "HMDRotationZ"]]
+                for col in other_cols:
+                    row[col] = group[col].mean()
+
+                avg_rows.append(row)
+
+            # Create a new DataFrame from the averaged rows
+            avg_df = pd.DataFrame(avg_rows)
+
+            # Save dataframe in the output folder
+            avg_df.to_csv(os.path.join(common.get_configs("output"), f"{video_id}_avg_df.csv"), index=False)
 
     def draw_ttest_anova(self, fig, times, name_file, yaxis_range, yaxis_step, ttest_signals, ttest_marker,
                          ttest_marker_size, ttest_marker_colour, ttest_annotations_font_size, ttest_annotations_colour,
@@ -736,7 +760,7 @@ class HMD_helper:
         counter_ttest = 0
         counter_anova = 0
 
-        # calculate resolution based on the param in
+        # calculate resolution based on the param
         resolution = common.get_configs("kp_resolution") / 1000.0
 
         # --- t-test markers ---
@@ -747,7 +771,7 @@ class HMD_helper:
                 )  # type: ignore
 
                 # Save csv
-                # todo: rounding to 2 is hardcoded and wrong?
+                # TODO: rounding to 2 is hardcoded and wrong?
                 times_csv = [round(i * resolution, 2) for i in range(len(comp['signal_1']))]
                 self.save_stats_csv(t=times_csv,
                                     p_values=p_vals,
@@ -780,41 +804,6 @@ class HMD_helper:
                                        font=dict(size=ttest_annotations_font_size,
                                                  color=ttest_annotations_colour))
                     counter_ttest += 1
-
-        # --- ANOVA markers ---
-        if anova_signals:
-            counter_anova = counter_ttest
-            for comp in anova_signals:
-                p_vals, sig = self.anova(comp)
-                self.save_stats_csv(t=list(range(len(comp['signals'][0]))),
-                                    p_values=p_vals,
-                                    name_file=f"{comp['label']}_{name_file}.csv")
-
-                if any(sig):
-                    xs, ys = [], []
-                    y_offset = original_min - ttest_anova_row_height * (counter_anova + 1)
-                    for i, s in enumerate(sig):
-                        if s:
-                            xs.append(times[i])
-                            ys.append(y_offset)
-
-                    fig.add_trace(go.Scatter(x=xs,
-                                             y=ys,
-                                             mode='markers',
-                                             marker=dict(symbol=anova_marker,
-                                                         size=anova_marker_size,
-                                                         color=anova_marker_colour),
-                                             text=p_vals,
-                                             showlegend=False,
-                                             hovertemplate=f"{comp['label']}: time=%{{x}}, p=%{{text}}"))
-                    fig.add_annotation(x=times[0] - (times[-1] - times[0]) * 0.05,
-                                       y=y_offset,
-                                       text=comp['label'],
-                                       xanchor='right',
-                                       showarrow=False,
-                                       font=dict(size=anova_annotations_font_size,
-                                                 color=anova_annotations_colour))
-                counter_anova += 1
 
         # --- Adjust axis ---
         n_rows = counter_ttest + max(0, counter_anova - counter_ttest)
@@ -914,95 +903,6 @@ class HMD_helper:
                 # increase counter of lines drawn
                 counter_lines = counter_lines + 1
 
-    def avg_csv_files(self, data_folder, mapping):
-        """
-        Averages multiple CSV files corresponding to the same video ID. Each file is expected to contain
-        time-series data, including quaternion rotations and potentially other columns. The output is a
-        CSV file with averaged values for each timestamp across the files.
-
-        Parameters:
-            data_folder (str): Path to the folder containing input CSV files.
-            mapping (pd.DataFrame): A DataFrame containing metadata, including 'video_id' and 'video_length'.
-
-        Outputs:
-            For each video_id, saves an averaged DataFrame as a CSV in the output directory.
-            The output CSV is named as "<video_id>_avg_df.csv".
-        """
-
-        # Group file paths by video_id using a helper function
-        grouped_data = HMD_class.group_files_by_video_id(data_folder, mapping)
-
-        # calculate resolution based on the param in
-        resolution = common.get_configs("kp_resolution") / 1000.0
-
-        # Process each video ID and its associated files
-        logger.info("Exporting CSV files.")
-        for video_id, file_locations in tqdm(grouped_data.items()):
-            all_dfs = []
-
-            # Retrieve the video length from the mapping DataFrame
-            video_length_row = mapping.loc[mapping["video_id"] == video_id, "video_length"]
-            if video_length_row.empty:
-                logger.info(f"Video length not found for video_id: {video_id}")
-                continue
-
-            video_length = video_length_row.values[0] / 1000  # Convert milliseconds to seconds
-
-            # Read and process each file associated with the video ID
-            for file_location in file_locations:
-                df = pd.read_csv(file_location)
-
-                # Filter the DataFrame to only include rows where Timestamp >= 0 and <= video_length
-                # todo: 0.01 hardcoded value does not work?
-                df = df[(df["Timestamp"] >= 0) & (df["Timestamp"] <= video_length + 0.01)]
-
-                # Round the Timestamp to the nearest multiple of resolution
-                df["Timestamp"] = ((df["Timestamp"] / resolution).round() * resolution).astype(float)
-
-                all_dfs.append(df)
-
-            # Skip if no dataframes were collected
-            if not all_dfs:
-                continue
-
-            # Concatenate all DataFrames row-wise
-            combined_df = pd.concat(all_dfs, ignore_index=True)
-
-            # Group by 'Timestamp'
-            grouped = combined_df.groupby('Timestamp')
-
-            avg_rows = []
-            for timestamp, group in grouped:
-                row = {'Timestamp': timestamp}
-
-                # Perform SLERP-based quaternion averaging if quaternion columns are present
-                if {"HMDRotationW", "HMDRotationX", "HMDRotationY", "HMDRotationZ"}.issubset(group.columns):
-                    quats = group[["HMDRotationW", "HMDRotationX", "HMDRotationY", "HMDRotationZ"]].values.tolist()
-                    avg_quat = HMD_class.average_quaternions_eigen(quats)
-                    row.update({
-                        "HMDRotationW": avg_quat[0],
-                        "HMDRotationX": avg_quat[1],
-                        "HMDRotationY": avg_quat[2],
-                        "HMDRotationZ": avg_quat[3],
-                    })
-
-                # Average all remaining columns (excluding Timestamp and quaternion cols)
-                other_cols = [col for col in group.columns if col not in ["Timestamp",
-                                                                          "HMDRotationW",
-                                                                          "HMDRotationX",
-                                                                          "HMDRotationY",
-                                                                          "HMDRotationZ"]]
-                for col in other_cols:
-                    row[col] = group[col].mean()
-
-                avg_rows.append(row)
-
-            # Create a new DataFrame from the averaged rows
-            avg_df = pd.DataFrame(avg_rows)
-
-            # Save dataframe in the output folder
-            avg_df.to_csv(os.path.join(common.get_configs("output"), f"{video_id}_avg_df.csv"), index=False)
-
     def export_participant_trigger_matrix(self, data_folder, video_id, output_file, column_name, mapping):
         """
         Export a matrix of column name values per participant for a given video.
@@ -1042,7 +942,7 @@ class HMD_helper:
                     df["Timestamp"] = ((df["Timestamp"] / resolution).round() * resolution).round(2)
 
                     # Group by timestamp and compute average of target column
-                    grouped = df.groupby("Timestamp", as_index=True)[column_name].mean()
+                    grouped = df.groupby("Timestamp", as_index=True)[column_name].apply(list)
 
                     # Store trigger values
                     participant_matrix[f"P{participant_id}"] = grouped.to_dict()
@@ -1053,11 +953,8 @@ class HMD_helper:
         video_length_row = mapping.loc[mapping["video_id"] == video_id, "video_length"]
         if not video_length_row.empty:
             video_length_sec = video_length_row.values[0] / 1000  # convert ms to sec
-            all_timestamps = np.round(np.arange(resolution, video_length_sec + resolution, resolution), 2).tolist()
+            all_timestamps = np.round(np.arange(0.0, video_length_sec + resolution, resolution), 2).tolist()
 
-            # Save timestamps
-            # ts_output_path = output_file.replace(".csv", "_timestamps.csv")
-            # pd.DataFrame({"Timestamp": all_timestamps}).to_csv(ts_output_path, index=False)
         else:
             logger.warning(f"Video length not found in mapping for video_id {video_id}")
 
@@ -1178,7 +1075,7 @@ class HMD_helper:
         )
 
         test_raw_df = pd.read_csv(f"_output/participant_{column_name}_trial_6.csv")
-        test_matrix = test_raw_df.drop(columns=["Timestamp"]).values.tolist()
+        test_matrix = extra_class.extract_time_series_values(test_raw_df)
 
         # Process each video (including 'test')
         for video in plot_videos:
@@ -1193,14 +1090,12 @@ class HMD_helper:
             )
 
             trial_raw_df = pd.read_csv(f"_output/participant_{column_name}_{video}.csv")
-            trial_matrix = trial_raw_df.drop(columns=["Timestamp"]).values.tolist()
+            trial_matrix = extra_class.extract_time_series_values(trial_raw_df)
 
-            df = pd.read_csv(f"_output/{video}_avg_df.csv")
+            avg_df = extra_class.average_dataframe_vectors_with_timestamp(trial_raw_df,
+                                                                          column_name=f"{column_name}")
 
-            if column_name not in df.columns:
-                raise ValueError(f"Column '{column_name}' not found in file: _output/{video}_avg_df.csv")
-
-            all_dfs.append(df)
+            all_dfs.append(avg_df)
             all_labels.append(display_name)
 
             # Skip t-test if comparing test to itself
@@ -1212,7 +1107,7 @@ class HMD_helper:
                     "label": f"{display_name}"
                 })
 
-        # Combine DataFrames
+        # Combine dataFrames or plotting
         combined_df = pd.DataFrame()
         combined_df["Timestamp"] = all_dfs[0]["Timestamp"]
 
@@ -1572,8 +1467,6 @@ class HMD_helper:
         for i, (means, deviations) in enumerate(data_to_plot):
             row = (i // 2) + 1
             col = (i % 2) + 1
-            # Set y-axis range: fixed to 10 for first 3 plots, dynamic for composite
-            # y_max = 13 if i < 3 else max(means) + 1.5
 
             fig.add_trace(
                 go.Bar(

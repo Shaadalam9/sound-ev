@@ -1,8 +1,8 @@
 from custom_logger import CustomLogger
 import math
 import numpy as np
-import os
 import pandas as pd
+import os
 from collections import defaultdict
 
 logger = CustomLogger(__name__)  # use custom logger
@@ -80,7 +80,7 @@ class HMD_yaw():
 
         # Ensure scalar-first order: [w, x, y, z]
         return avg_q if avg_q[0] >= 0 else -avg_q  # Normalise sign
-
+    
     def compute_yaw_from_quaternions(self, data_folder, video_id, mapping, output_file):
         """
         Computes the average yaw angle per timestamp using quaternions for a given video_id.

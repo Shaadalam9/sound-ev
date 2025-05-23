@@ -66,7 +66,6 @@ if __name__ == "__main__":
 
     # Read and process data
     HMD.read_slider_data(data_folder, mapping, output_folder)
-    HMD.avg_csv_files(data_folder, mapping)
 
     # Keypress data
     HMD.plot_column(mapping,
