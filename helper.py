@@ -38,7 +38,7 @@ class HMD_helper:
     folder_stats = 'statistics'  # subdirectory to save statistical output
 
     def __init__(self):
-        pass
+        self.test_trial = common.get_configs("compare_trial")
 
     def smoothen_filter(self, signal, type_flter='OneEuroFilter'):
         """Smoothen list with a filter.
@@ -60,6 +60,17 @@ class HMD_helper:
             return -1
 
     def get_sound_clip_name(self, df, video_id_value):
+        """
+        Returns the display name for a given video_id from the provided DataFrame.
+
+        Args:
+            df (pd.DataFrame): DataFrame containing at least 'video_id' and 'display_name' columns.
+            video_id_value (str or int): The video_id to search for.
+
+        Returns:
+            str or None: The corresponding display name, or None if not found.
+        """
+        # Filter DataFrame for the matching video_id and get the display_name
         result = df.loc[df["video_id"] == video_id_value, "display_name"]
         return result.iloc[0] if not result.empty else None
 
@@ -163,42 +174,55 @@ class HMD_helper:
 
     @staticmethod
     def read_slider_data(data_folder, mapping, output_folder):
-        participant_data = {}
-        all_trials = set()
+        """
+        Reads participant slider CSVs from all participant folders, aggregates the
+        ratings (noticeability, informativeness, annoyance) for all trials,
+        and saves a summary CSV per slider to the output folder.
 
-        # load mapping file
+        Args:
+            data_folder (str): Path to the folder containing participant subfolders.
+            mapping (pd.DataFrame): Mapping DataFrame with 'video_id' and 'sound_clip_name'.
+            output_folder (str): Directory to save aggregated CSVs for each slider.
+        """
+        participant_data = {}  # Store per-participant DataFrames
+        all_trials = set()  # Collect all unique trial IDs
+
+        # Create a mapping from video_id to sound_clip_name for column renaming
         mapping_dict = dict(zip(mapping["video_id"], mapping["sound_clip_name"]))
 
-        # iterate over participant folders
+        # Iterate over each participant's folder
         for folder in sorted(os.listdir(data_folder)):
             folder_path = os.path.join(data_folder, folder)
             if not os.path.isdir(folder_path):
                 continue
 
-            # extract participant id
+            # Parse participant ID from folder name
             match = re.match(r'Participant_(\d+)_', folder)
             if not match:
                 continue
             participant_id = int(match.group(1))
 
-            # find the main csv file containing slider data
+            # Find the CSV with slider data for this participant
             for file in os.listdir(folder_path):
                 file_path = os.path.join(folder_path, file)
+                # Expected pattern: Participant_[id]_[number]_[number].csv
                 if re.match(rf'Participant_{participant_id}_\d+_\d+\.csv', file):
+                    # Assume no header: columns are trial, noticeability, info, annoyance
                     df = pd.read_csv(file_path, header=None, names=["trial", "noticeability", "info", "annoyance"])
                     df.set_index("trial", inplace=True)
                     participant_data[participant_id] = df
                     all_trials.update(df.index)
-                    break
+                    break  # Stop at first valid slider CSV
 
-        # create a sorted list of all trials
+        # Build a sorted trial list (with 'test' first if present)
         all_trials = sorted([t for t in all_trials if t != "test"],
                             key=lambda x: int(re.search(r'\d+', x).group()))  # type: ignore
         all_trials.insert(0, "test") if "test" in all_trials else None
 
-        # construct separate dataframes for each slider
+        # Prepare dict to aggregate each slider rating across all participants
         slider_data = {"noticeability": [], "info": [], "annoyance": []}
 
+        # For each participant, gather ratings for all trials, filling missing with None
         for participant_id, df in sorted(participant_data.items()):
             row = {"participant_id": participant_id}
             for trial in all_trials:
@@ -207,21 +231,23 @@ class HMD_helper:
                 else:
                     row[trial] = [None, None, None]
 
+            # Split values for each slider
             slider_data["noticeability"].append([participant_id] + [vals[0] for vals in row.values() if isinstance(vals, list)])  # noqa: E501
             slider_data["info"].append([participant_id] + [vals[1] for vals in row.values() if isinstance(vals, list)])
             slider_data["annoyance"].append([participant_id] + [vals[2] for vals in row.values() if isinstance(vals, list)])  # noqa: E501
 
-        # convert lists to dataframes and rename columns based on mapping file
+        # Convert lists to DataFrames, rename columns, and add average row
         for slider, data in slider_data.items():
             df = pd.DataFrame(data, columns=["participant_id"] + all_trials)
+            # Rename trial columns using mapping (video_id to sound_clip_name)
             df.rename(columns={trial: mapping_dict.get(trial, trial) for trial in all_trials}, inplace=True)
 
-            # add average row
+            # Add average row at the end (ignoring participant_id)
             avg_values = df.iloc[:, 1:].mean(skipna=True)
             avg_row = pd.DataFrame([["average"] + avg_values.tolist()], columns=df.columns)
             df = pd.concat([df, avg_row], ignore_index=True)
 
-            # save each slider dataframe separately
+            # Save the aggregated slider data to CSV
             output_path = os.path.join(output_folder, f"slider_input_{slider}.csv")
             df.to_csv(output_path, index=False)
 
@@ -273,7 +299,7 @@ class HMD_helper:
                     py.offline.plot(fig, filename=os.path.join(path_final, name + '.html'), auto_open=False)
         # remove white margins
         if remove_margins:
-            fig.update_layout(margin=dict(l=2, r=2, t=20, b=12))
+            fig.update_layout(margin=dict(l=100, r=2, t=20, b=12))
         # save as eps
         if save_eps:
             fig.write_image(os.path.join(path, name + '.eps'), width=width, height=height)
@@ -305,9 +331,11 @@ class HMD_helper:
                 anova_marker_size=3, anova_marker_colour='black', anova_annotations_font_size=10,
                 anova_annotations_colour='black', ttest_anova_row_height=0.5, xaxis_step=5,
                 yaxis_step=5, y_legend_bar=None, line_width=1, bar_font_size=None,
-                custom_line_colors=None, flag_multiply=False, margin=None):
+                custom_line_colors=None, custom_line_dashes=None, flag_trigger=False, margin=None):
         """
-        Plot keypresses.
+        Plots keypress (response) data from a dataframe using Plotly, with options for custom lines,
+        annotations, t-test and ANOVA result overlays, event markers, and customizable styling and saving.
+
 
         Args:
             df (dataframe): DataFrame with stimuli data.
@@ -357,6 +385,12 @@ class HMD_helper:
             yaxis_step (float): Step between ticks on y axis.
             y_legend_bar (list, optional): Names for variables in bar data for legend.
             line_width (int): Line width for keypress data plot.
+            bar_font_size (int, optional): Font size for bar plot text, if applicable.
+            custom_line_colors (list, optional): List of custom colors for each line.
+            custom_line_dashes (list, optional): List of custom dash styles for each line.
+            flag_trigger (bool, optional): If True, scale y values to percentages (multiply by 100).
+            margin (dict, optional): Plotly layout margin dict (e.g., {'l':40, 'r':40, ...}) for fine control.
+
         """
         # todo: update docstrings in all methods
 
@@ -387,10 +421,11 @@ class HMD_helper:
                 name = y_legend_kp[row_number]
             else:
                 name = key
+
             # smoothen signal
             if self.smoothen_signal:
                 if isinstance(values, pd.Series):
-                    # >>> FIX: Replace NaNs with 0 before smoothing <<<
+                    # Replace NaNs with 0 before smoothing
                     values = values.fillna(0).tolist()
                     values = self.smoothen_filter(values)
             else:
@@ -398,12 +433,13 @@ class HMD_helper:
                 values = values.fillna(0).tolist() if isinstance(values, pd.Series) else [v if not pd.isna(v) else 0 for v in values]  # noqa: E501
 
             # convert to 0-100%
-            if flag_multiply:
+            if flag_trigger:
                 values = [v * 100 for v in values]  # type: ignore
             else:
                 values = [v for v in values]  # type: ignore
 
-            all_values.extend(values)  # type: ignore # collect values for y-axis tick range
+            # collect values for y-axis tick range
+            all_values.extend(values)  # type: ignore
 
             name = y_legend_kp[row_number] if y_legend_kp else key
 
@@ -412,7 +448,9 @@ class HMD_helper:
                                      mode='lines',
                                      x=times,
                                      line=dict(width=line_width,
-                                               color=custom_line_colors[row_number] if custom_line_colors else None),
+                                               color=custom_line_colors[row_number] if custom_line_colors else None,
+                                               dash=custom_line_dashes[row_number] if custom_line_dashes else None,
+                                               ),
                                      name=name))
 
         # draw events
@@ -427,11 +465,15 @@ class HMD_helper:
 
         # update axis
         if xaxis_step:
-            fig.update_xaxes(title_text=xaxis_title, range=xaxis_range, dtick=xaxis_step,
-                             title_font=dict(size=font_size or common.get_configs('font_size')))
+            fig.update_xaxes(title_text=xaxis_title,
+                             range=xaxis_range,
+                             dtick=xaxis_step,
+                             title_font=dict(family=font_family, size=font_size or common.get_configs('font_size'))
+                             )
         else:
-            fig.update_xaxes(title_text=xaxis_title, range=xaxis_range,
-                             title_font=dict(size=font_size or common.get_configs('font_size')))
+            fig.update_xaxes(title_text=xaxis_title,
+                             range=xaxis_range,
+                             title_font=dict(family=font_family, size=font_size or common.get_configs('font_size')))
         # Find actual y range across all series
         actual_ymin = min(all_values)
         actual_ymax = max(all_values)
@@ -458,7 +500,7 @@ class HMD_helper:
             automargin=True,
             title=dict(
                         text="",
-                        # font=dict(size=font_size or common.get_configs('font_size')),
+                        font=dict(family=font_family, size=font_size or common.get_configs('font_size')),
                         standoff=0
             )
         )
@@ -471,7 +513,7 @@ class HMD_helper:
             y=0.5 + yaxis_title_offset,  # push label higher (was 0.5 + offset)
             showarrow=False,
             textangle=-90,
-            font=dict(size=font_size or common.get_configs('font_size')),
+            font=dict(family=font_family, size=font_size or common.get_configs('font_size')),
             xanchor='center',
             yanchor='middle'
         )
@@ -510,7 +552,8 @@ class HMD_helper:
                               anova_annotations_font_size=anova_annotations_font_size,
                               anova_annotations_colour=anova_annotations_colour,
                               ttest_anova_row_height=ttest_anova_row_height,
-                              ttest_annotation_x=ttest_annotation_x)
+                              ttest_annotation_x=ttest_annotation_x,
+                              flag_trigger=flag_trigger)
 
         # update template
         fig.update_layout(template=self.template)
@@ -528,7 +571,8 @@ class HMD_helper:
             fig.update_layout(legend=dict(x=legend_x,
                                           y=legend_y,
                                           bgcolor='rgba(0,0,0,0)',
-                                          font=dict(size=font_size)))
+                                          font=dict(family=font_family,
+                                                    size=font_size or common.get_configs('font_size'))))
 
         # multiple columns
         elif legend_columns == 2:
@@ -536,6 +580,7 @@ class HMD_helper:
                 legend=dict(
                     x=legend_x,
                     y=legend_y,
+                    # margin=dict(l=0, r=0, t=0, b=0, pad=0),
                     bgcolor='rgba(0,0,0,0)',
                     font=dict(size=font_size or common.get_configs('font_size')),
                     orientation='h',  # must be vertical
@@ -574,7 +619,7 @@ class HMD_helper:
         if save_file:
             self.save_plotly(fig=fig,
                              name=name_file,
-                             remove_margins=False,
+                             remove_margins=True,
                              width=fig_save_width,
                              height=fig_save_height,
                              save_final=save_final)  # also save as "final" figure
@@ -658,7 +703,7 @@ class HMD_helper:
         grouped_data = HMD_class.group_files_by_video_id(data_folder, mapping)
 
         # calculate resolution based on the param in
-        resolution = common.get_configs("kp_resolution") / 1000.0
+        resolution = common.get_configs("yaw_kp_resolution") / 1000.0
 
         # Process each video ID and its associated files
         logger.info("Exporting CSV files.")
@@ -732,7 +777,7 @@ class HMD_helper:
                          ttest_marker_size, ttest_marker_colour, ttest_annotations_font_size, ttest_annotations_colour,
                          anova_signals, anova_marker, anova_marker_size, anova_marker_colour,
                          anova_annotations_font_size, anova_annotations_colour, ttest_anova_row_height,
-                         ttest_annotation_x):
+                         ttest_annotation_x, flag_trigger):
         """Draw ttest and anova test rows.
 
         Args:
@@ -761,7 +806,10 @@ class HMD_helper:
         counter_anova = 0
 
         # calculate resolution based on the param
-        resolution = common.get_configs("kp_resolution") / 1000.0
+        if flag_trigger:
+            resolution = common.get_configs("trigger_kp_resolution") / 1000.0
+        else:
+            resolution = common.get_configs("yaw_kp_resolution") / 1000.0
 
         # --- t-test markers ---
         if ttest_signals:
@@ -791,7 +839,9 @@ class HMD_helper:
                             y=y,
                             text='*',
                             showarrow=False,
-                            font=dict(size=ttest_marker_size, color=ttest_marker_colour),
+                            font=dict(family=common.get_configs("font_family"),
+                                      size=ttest_marker_size,
+                                      color=ttest_marker_colour),
                             hovertext=f"{comp['label']}: time={x}, p={p_val}",
                             hoverlabel=dict(bgcolor="white"),
                         )
@@ -801,7 +851,8 @@ class HMD_helper:
                                        text=comp['label'],
                                        xanchor='right',
                                        showarrow=False,
-                                       font=dict(size=ttest_annotations_font_size,
+                                       font=dict(family=common.get_configs("font_family"),
+                                                 size=ttest_annotations_font_size,
                                                  color=ttest_annotations_colour))
                     counter_ttest += 1
 
@@ -891,7 +942,9 @@ class HMD_helper:
                                        x=(event['end'] + event['start']) / 2,
                                        y=yaxis_range[1] - counter_lines * 2 - 1,  # use ylim value and draw lower
                                        showarrow=False,
-                                       font=dict(size=events_annotations_font_size, color=events_annotations_colour))
+                                       font=dict(family=common.get_configs("font_family"),
+                                                 size=events_annotations_font_size,
+                                                 color=events_annotations_colour))
                 # just draw text label
                 else:
                     fig.add_annotation(text=event['annotation'],
@@ -899,188 +952,215 @@ class HMD_helper:
                                        y=yaxis_range[1],
                                        # y=yaxis_range[1] - counter_lines * 2 - 0.2,  # use ylim value and draw lower
                                        showarrow=False,
-                                       font=dict(size=events_annotations_font_size, color=events_annotations_colour))
+                                       font=dict(family=common.get_configs("font_family"),
+                                                 size=events_annotations_font_size,
+                                                 color=events_annotations_colour))
                 # increase counter of lines drawn
                 counter_lines = counter_lines + 1
 
     def export_participant_trigger_matrix(self, data_folder, video_id, output_file, column_name, mapping):
         """
-        Export a matrix of column name values per participant for a given video.
+        Export a matrix of trigger (or other column) values per participant for a given video.
+
+        Each cell contains a list of values (one per frame or timepoint) for that participant and timestamp.
+        Missing data is left as NaN, not zero.
 
         Args:
-            data_folder (str): Path to folder containing participant data.
-            video_id (str): Target video_id (e.g. '002', 'test', etc.).
+            data_folder (str): Path to folder containing participant subfolders with CSVs.
+            video_id (str): Target video identifier (e.g. '002', 'test', etc.).
             output_file (str): Path to output CSV file (e.g. '_output/participant_trigger_002.csv').
-            column_name (str): .
-            mapping (DataFrame): The mapping DataFrame containing video length info.
+            column_name (str): Name of the column to export (e.g. 'TriggerValueRight').
+            mapping (pd.DataFrame): Mapping DataFrame containing at least 'video_id' and 'video_length'.
         """
-        participant_matrix = {}
-        all_timestamps = set()
+        participant_matrix = {}    # Store trigger value lists for each participant, keyed by timestamp
+        all_timestamps = set()     # Collect all observed timestamps for alignment
 
-        # calculate resolution based on the param in
-        resolution = common.get_configs("kp_resolution") / 1000.0
+        # Calculate time bin resolution (in seconds) from config
+        resolution = common.get_configs("trigger_kp_resolution") / 1000.0
 
+        # Iterate over participant folders
         for folder in sorted(os.listdir(data_folder)):
             folder_path = os.path.join(data_folder, folder)
             if not os.path.isdir(folder_path):
-                continue
+                continue  # Ignore files, only process directories
 
+            # Extract participant ID from folder name (expecting "Participant_###_...")
             match = re.match(r'Participant_(\d+)_', folder)
             if not match:
                 continue
             participant_id = int(match.group(1))
 
+            # Search for this participant's file matching the video ID
             for file in os.listdir(folder_path):
                 if f"_{video_id}.csv" in file:
                     file_path = os.path.join(folder_path, file)
                     df = pd.read_csv(file_path)
 
+                    # Check required columns
                     if "Timestamp" not in df or column_name not in df:
                         continue
 
-                    # Bin timestamps to resolution
+                    # Bin timestamps to specified resolution
                     df["Timestamp"] = ((df["Timestamp"] / resolution).round() * resolution).round(2)
 
-                    # Group by timestamp and compute average of target column
+                    # Group by timestamp, collect all values in a list per bin
                     grouped = df.groupby("Timestamp", as_index=True)[column_name].apply(list)
 
-                    # Store trigger values
+                    # Store the resulting dict: timestamp -> list of values
                     participant_matrix[f"P{participant_id}"] = grouped.to_dict()
                     all_timestamps.update(grouped.index)
-                    break
+                    break  # Only process the first matching file for this participant
 
-        # Get aligned timestamps based on video length from mapping
+        # Get the expected timeline from mapping for alignment (using video_length)
         video_length_row = mapping.loc[mapping["video_id"] == video_id, "video_length"]
         if not video_length_row.empty:
-            video_length_sec = video_length_row.values[0] / 1000  # convert ms to sec
+            video_length_sec = video_length_row.values[0] / 1000  # Convert ms to seconds
             all_timestamps = np.round(np.arange(0.0, video_length_sec + resolution, resolution), 2).tolist()
 
         else:
             logger.warning(f"Video length not found in mapping for video_id {video_id}")
 
-        # Build DataFrame
+        # Build DataFrame with one row per timestamp
         combined_df = pd.DataFrame({"Timestamp": all_timestamps})
 
-        # Do NOT fill missing with 0 – preserve NaN for clarity
+        # For each participant, add a column: each entry is a list or NaN (if no data for that timestamp)
         for participant, values in participant_matrix.items():
             combined_df[participant] = combined_df["Timestamp"].map(values)
 
+        # Save matrix to CSV (do NOT fill missing with zero; keep NaN for clarity)
         combined_df.to_csv(output_file, index=False)
 
-    def export_participant_yaw_matrix(self, data_folder, video_id, output_file, mapping):
+    def export_participant_quaternion_matrix(self, data_folder, video_id, output_file, mapping):
         """
-        Export a matrix of yaw angles (computed from quaternions) per participant for a given video.
+        Export a matrix of raw HMD quaternions per participant per timestamp for a given video.
+
+        Each cell contains a stringified list of quaternion vectors for that participant and timestamp.
+        This allows post-hoc reconstruction of head rotation trajectories per participant,
+        aligned to a common set of timestamps for the given video.
 
         Args:
-            data_folder (str): Path to folder containing participant data.
-            video_id (str): Target video_id (e.g. '002', 'test', etc.).
-            output_file (str): Path to output CSV file (e.g. '_output/participant_yaw_002.csv').
-            mapping (DataFrame): The mapping DataFrame containing video length info.
+            data_folder (str): Folder containing all participant data folders.
+            video_id (str): Video identifier (e.g. '002', 'test', etc.).
+            output_file (str): Output CSV file path (e.g. '_output/participant_quat_002.csv').
+            mapping (pd.DataFrame): DataFrame containing at least 'video_id' and 'video_length' columns.
         """
-        participant_matrix = {}
-        all_timestamps = set()
+        participant_matrix = {}  # Store quaternions per participant per timestamp
+        all_timestamps = set()  # Collect all timestamps observed
 
-        # calculate resolution based on the param in
-        resolution = common.get_configs("kp_resolution") / 1000.0
+        # Bin size for timestamps (in seconds)
+        resolution = common.get_configs("yaw_kp_resolution") / 1000.0
 
+        # Iterate over all participant folders in the data directory
         for folder in sorted(os.listdir(data_folder)):
             folder_path = os.path.join(data_folder, folder)
             if not os.path.isdir(folder_path):
-                continue
+                continue  # Skip files
 
+            # Extract participant ID from folder name (expecting "Participant_###_...")
             match = re.match(r'Participant_(\d+)_', folder)
             if not match:
                 continue
             participant_id = int(match.group(1))
 
+            # Find file(s) for this participant matching the current video_id
             for file in os.listdir(folder_path):
                 if f"_{video_id}.csv" in file:
                     file_path = os.path.join(folder_path, file)
                     df = pd.read_csv(file_path)
 
                     required_cols = {"Timestamp", "HMDRotationW", "HMDRotationX", "HMDRotationY", "HMDRotationZ"}
+                    # Skip files not containing quaternion data
                     if not required_cols.issubset(df.columns):
                         continue
 
-                    # Bin timestamps to resolution
+                    # Bin the timestamps to the specified resolution
                     df["Timestamp"] = ((df["Timestamp"] / resolution).round() * resolution).round(2)
 
-                    # Group quaternions by timestamp and compute average quaternion → yaw
-                    yaw_by_time = (
+                    # Group all quaternion lists by timestamp for this participant
+                    quats_by_time = (
                         df.groupby("Timestamp")[["HMDRotationW", "HMDRotationX", "HMDRotationY", "HMDRotationZ"]]
-                          .apply(lambda group: HMD_class.quaternion_to_euler(
-                              *HMD_class.average_quaternions_eigen(group.values)
-                          )[2]).reset_index(name="Yaw")  
+                        .apply(lambda g: g.values.tolist()).to_dict()
                     )
 
-                    # Store yaw values
-                    participant_matrix[f"P{participant_id}"] = dict(zip(yaw_by_time["Timestamp"], yaw_by_time["Yaw"]))
-                    all_timestamps.update(yaw_by_time["Timestamp"])
-                    break
+                    participant_matrix[f"P{participant_id}"] = quats_by_time
+                    all_timestamps.update(quats_by_time.keys())
+                    break  # Only use the first matching file for this participant
 
-        # Determine aligned timestamps using mapping
+        # Build the set of aligned timestamps using the expected video duration from mapping
         video_length_row = mapping.loc[mapping["video_id"] == video_id, "video_length"]
         if not video_length_row.empty:
-            video_length_sec = video_length_row.values[0] / 1000  # convert ms to sec
-            all_timestamps = np.round(np.arange(resolution, video_length_sec + resolution, resolution), 2).tolist()
-
-            # Save timestamps
-            ts_output_path = output_file.replace(".csv", "_timestamps.csv")
-            pd.DataFrame({"Timestamp": all_timestamps}).to_csv(ts_output_path, index=False)
+            video_length_sec = video_length_row.values[0] / 1000  # Convert ms to seconds
+            all_timestamps = np.round(np.arange(0, video_length_sec + resolution, resolution), 2).tolist()
         else:
             logger.warning(f"Video length not found in mapping for video_id {video_id}")
 
-        # Build DataFrame
+        # Create DataFrame with 'Timestamp' as the index column
         combined_df = pd.DataFrame({"Timestamp": all_timestamps})
-        for participant, values in participant_matrix.items():
-            combined_df[participant] = combined_df["Timestamp"].map(values)
 
+        # For each participant, fill the column with the stringified list of quaternions at each timestamp
+        for participant, values in participant_matrix.items():
+            # If a timestamp is missing for a participant, use empty list
+            combined_df[participant] = combined_df["Timestamp"].map(
+                lambda ts: str(values.get(ts, []))
+            )
+
+        # Write the matrix to the specified CSV file
         combined_df.to_csv(output_file, index=False)
 
     def plot_column(self, mapping, column_name="TriggerValueRight", xaxis_title=None, yaxis_title=None,
                     xaxis_range=None, yaxis_range=None, margin=None):
         """
-        Generate a comparison plot of keypress data and subjective slider ratings
-        across different video trials relative to a test condition.
+        Generate a comparison plot of keypress data (or other time-series columns) and subjective slider ratings
+        across multiple video trials relative to a test/reference condition.
 
         This function processes participant trigger matrices for each trial,
         aligns timestamps, attaches slider-based subjective ratings (annoyance,
-        informativeness, noticeability), and prepares data for visualization
-        including significance testing (t-tests) between the test condition and each trial.
+        informativeness, noticeability), and prepares data for visualization,
+        including significance testing (paired t-tests) between the test trial and each comparison trial.
 
         Args:
-            mapping (pd.DataFrame): A dataframe containing metadata about videos,
-                                    including 'video_id' and 'sound_clip_name'.
-            column_name (str): The name of the column to extract for plotting
-                               (e.g., 'TriggerValueRight', 'TriggerValueLeft').
+            mapping (pd.DataFrame): DataFrame containing video metadata, including
+                'video_id', 'sound_clip_name', 'display_name', and 'colour'.
+            column_name (str): The column to extract for plotting (e.g., 'TriggerValueRight').
+            xaxis_title (str, optional): Custom label for the x-axis.
+            yaxis_title (str, optional): Custom label for the y-axis.
+            xaxis_range (list, optional): x-axis [min, max] limits for the plot.
+            yaxis_range (list, optional): y-axis [min, max] limits for the plot.
+            margin (dict, optional): Custom plot margin dictionary.
         """
-        # Filter out the 'test' and 'est' video IDs from further processing
+        # Filter out control/test video IDs for comparison
         video_id = mapping["video_id"]
         plot_videos = video_id[~video_id.isin(["test", "est"])]
+
+        # Map display names to line colors for plotting
         color_dict = dict(zip(mapping['display_name'], mapping['colour']))
 
-        all_dfs = []
-        all_labels = []
-        ttest_signals = []
+        # Prepare containers for results and stats
+        all_dfs = []  # To store averaged time-series for each trial
+        all_labels = []  # To store display names for legend
+        ttest_signals = []  # For collecting signals for significance testing
 
-        data_folder = common.get_configs("data")
+        data_folder = common.get_configs("data")  # Get path to participant data
 
-        # Prepare test data
+        # === Export trigger matrix for test (reference) trial ===
         self.export_participant_trigger_matrix(
             data_folder=data_folder,
-            video_id="trial_6",
-            output_file=f"_output/participant_{column_name}_trial_6.csv",
+            video_id=self.test_trial,
+            output_file=f"_output/participant_{column_name}_{self.test_trial}.csv",
             column_name=column_name,
             mapping=mapping
         )
 
-        test_raw_df = pd.read_csv(f"_output/participant_{column_name}_trial_6.csv")
+        # Read matrix and extract time-series for the test trial
+        test_raw_df = pd.read_csv(f"_output/participant_{column_name}_{self.test_trial}.csv")
         test_matrix = extra_class.extract_time_series_values(test_raw_df)
 
-        # Process each video (including 'test')
+        # === Loop through each comparison trial ===
         for video in plot_videos:
+            # Get human-readable display name for this trial
             display_name = mapping.loc[mapping["video_id"] == video, "display_name"].values[0]
 
+            # Export trigger matrix for this video
             self.export_participant_trigger_matrix(
                 data_folder=data_folder,
                 video_id=video,
@@ -1089,16 +1169,18 @@ class HMD_helper:
                 mapping=mapping
             )
 
+            # Read and process the trigger matrix to extract time series for this trial
             trial_raw_df = pd.read_csv(f"_output/participant_{column_name}_{video}.csv")
             trial_matrix = extra_class.extract_time_series_values(trial_raw_df)
 
+            # Compute participant-averaged time series (by timestamp) for this trial
             avg_df = extra_class.average_dataframe_vectors_with_timestamp(trial_raw_df,
                                                                           column_name=f"{column_name}")
 
             all_dfs.append(avg_df)
             all_labels.append(display_name)
 
-            # Skip t-test if comparing test to itself
+            # Prepare paired t-test between test trial and each comparison trial
             if video != "test":
                 ttest_signals.append({
                     "signal_1": test_matrix,
@@ -1107,20 +1189,30 @@ class HMD_helper:
                     "label": f"{display_name}"
                 })
 
-        # Combine dataFrames or plotting
+        # === Combine all trial DataFrames for multi-trial plotting ===
         combined_df = pd.DataFrame()
         combined_df["Timestamp"] = all_dfs[0]["Timestamp"]
 
         for df, label in zip(all_dfs, all_labels):
             combined_df[label] = df[column_name]
 
+        # Optional: add vertical event lines (e.g., stimulus onset) to plot
         events = []
         events.append({'id': 1,
                        'start': 8.7,  # type: ignore
                        'end': 8.7,  # type: ignore
                        'annotation': ''})
 
-        # Plotting
+        # Set line style: dashed for test trial, solid for others
+        custom_line_dashes = []
+        for label in all_labels:
+            vid = mapping.loc[mapping["display_name"] == label, "video_id"].values[0]
+            if vid == self.test_trial:
+                custom_line_dashes.append("dash")
+            else:
+                custom_line_dashes.append("solid")
+
+        # === Generate the main plot (delegated to plot_kp helper) ===
         self.plot_kp(
             df=combined_df,
             y=all_labels,
@@ -1140,8 +1232,8 @@ class HMD_helper:
             ttest_signals=ttest_signals,
             ttest_anova_row_height=4,
             ttest_annotations_font_size=common.get_configs("font_size") - 6,
-            ttest_annotation_x=1.1,  # type: ignore
-            ttest_marker_size=common.get_configs("font_size") - 4,
+            ttest_annotation_x=0.7,  # type: ignore
+            ttest_marker_size=common.get_configs("font_size"),
             legend_x=0,
             legend_y=1.225,
             legend_columns=2,
@@ -1154,71 +1246,99 @@ class HMD_helper:
             save_file=True,
             save_final=True,
             custom_line_colors=[color_dict.get(label, None) for label in all_labels],
-            flag_multiply=True,
+            custom_line_dashes=custom_line_dashes,
+            flag_trigger=True,
             margin=margin
         )
 
     def plot_yaw(self, mapping, column_name="Yaw", margin=None):
         """
-        Generate a comparison plot of keypress data and subjective slider ratings
-        across different video trials relative to a test condition.
+        Generate a comparison plot of keypress yaw data and subjective slider ratings
+        for multiple video trials relative to a test condition.
 
-        This function processes participant trigger matrices for each trial,
-        aligns timestamps, attaches slider-based subjective ratings (annoyance,
-        informativeness, noticeability), and prepares data for visualization
-        including significance testing (t-tests) between the test condition and each trial.
+        The function processes trigger matrices for each participant and trial,
+        aligns time series data, attaches subjective slider-based ratings (annoyance,
+        informativeness, noticeability), and prepares the data for visualization.
+        Significance testing (paired t-tests) is performed between the test condition
+        and each other trial.
 
         Args:
-            mapping (pd.DataFrame): A dataframe containing metadata about videos,
-                                    including 'video_id' and 'sound_clip_name'.
-            column_name (str): The name of the column to extract for plotting
-                               (e.g., 'TriggerValueRight', 'TriggerValueLeft').
+            mapping (pd.DataFrame): DataFrame with video metadata, including
+                'video_id', 'sound_clip_name', 'display_name', and 'colour'.
+            column_name (str, optional): The matrix column to process (default "Yaw").
+            margin (dict, optional): Margin settings for plot layout.
         """
-        # Filter out the 'test' and 'est' video IDs from further processing
+
+        # Filter out any 'test' or 'est' control videos from the mapping
         video_id = mapping["video_id"]
         plot_videos = video_id[~video_id.isin(["test", "est"])]
+
+        # Build a color dictionary for plotting
         color_dict = dict(zip(mapping['display_name'], mapping['colour']))
 
-        all_dfs = []
-        all_labels = []
-        ttest_signals = []
+        all_dfs = []  # List to collect DataFrames for each trial
+        all_labels = []  # Corresponding list of human-friendly trial labels
+        ttest_signals = []  # Store t-test pairs for stats annotations
 
-        data_folder = common.get_configs("data")
+        data_folder = common.get_configs("data")  # Get path to raw data
 
-        # Prepare test data
-        self.export_participant_yaw_matrix(
+        # === Reference (test) trial: export yaw matrix and compute average yaw per timestamp ===
+        test_video = self.test_trial
+        test_participant_csv = f"_output/participant_{column_name}_{test_video}.csv"
+        self.export_participant_quaternion_matrix(
             data_folder=data_folder,
-            video_id="trial_6",
-            output_file=f"_output/participant_{column_name}_trial_6.csv",
+            video_id=test_video,
+            output_file=test_participant_csv,
             mapping=mapping
         )
 
-        test_raw_df = pd.read_csv(f"_output/participant_{column_name}_trial_6.csv")
-        test_matrix = test_raw_df.drop(columns=["Timestamp"]).values.tolist()
+        # Compute average yaw for the reference (test) trial and save
+        test_yaw_csv = f"_output/yaw_avg_{test_video}.csv"
+        HMD_class.compute_avg_yaw_from_matrix_csv(
+            input_csv=test_participant_csv,
+            output_csv=test_yaw_csv
+        )
+        test_matrix = extra_class.all_yaws_per_bin(
+            input_csv=f"_output/participant_{column_name}_{self.test_trial}.csv"
+        )
 
-        # Process each trial (including 'test' for plotting)
+        # === Iterate through each video trial (excluding control/test) ===
         for video in plot_videos:
+            # Get display name for current trial
             display_name = mapping.loc[mapping["video_id"] == video, "display_name"].values[0]
+            participant_csv = f"_output/participant_{column_name}_{video}.csv"
 
-            self.export_participant_yaw_matrix(
+            # Export quaternion/yaw matrix for this trial
+            self.export_participant_quaternion_matrix(
                 data_folder=data_folder,
                 video_id=video,
-                output_file=f"_output/participant_{column_name}_{video}.csv",
+                output_file=participant_csv,
                 mapping=mapping
             )
 
-            trial_raw_df = pd.read_csv(f"_output/participant_{column_name}_{video}.csv")
-            trial_matrix = trial_raw_df.drop(columns=["Timestamp"]).values.tolist()
-
+            # Compute avg yaw for this trial
             yaw_csv = f"_output/yaw_avg_{video}.csv"
-            HMD_class.compute_yaw_from_quaternions(data_folder, video, mapping, yaw_csv)
-            df = pd.read_csv(yaw_csv)
+            HMD_class.compute_avg_yaw_from_matrix_csv(
+                input_csv=participant_csv,
+                output_csv=yaw_csv
+            )
 
+            df = pd.read_csv(yaw_csv)
             all_dfs.append(df)
             all_labels.append(display_name)
 
-            # Skip t-test of 'test' vs. itself
-            if video != "test":
+            # Extract all per-bin yaw values (for saving and t-test)
+            trial_matrix = extra_class.all_yaws_per_bin(
+                input_csv=f"_output/participant_{column_name}_{video}.csv"
+            )
+
+            yaw_values = extra_class.flatten_trial_matrix(trial_matrix)
+            yaw_values = yaw_values[~np.isnan(yaw_values)]  # Remove NaNs if present
+            trial_txt_path = f"_output/yaw_values_{video}.txt"
+            np.savetxt(trial_txt_path, yaw_values)
+
+            # Prepare for t-test: compare each trial vs. test reference (exclude self-comparison)
+            if video != test_video:
                 ttest_signals.append({
                     "signal_1": test_matrix,
                     "signal_2": trial_matrix,
@@ -1226,20 +1346,31 @@ class HMD_helper:
                     "label": f"{display_name}"
                 })
 
-        # Combine DataFrames
+        # === Combine all trial DataFrames into a single one for plotting ===
         combined_df = pd.DataFrame()
         combined_df["Timestamp"] = all_dfs[0]["Timestamp"]
 
+        # Add events if required (here, a placeholder event at t=8.7s)
         events = []
         events.append({'id': 1,
                        'start': 8.7,  # type: ignore
                        'end': 8.7,  # type: ignore
                        'annotation': ''})
 
+        # Add trial average yaw series as columns
         for df, label in zip(all_dfs, all_labels):
-            combined_df[label] = df[column_name]
+            combined_df[label] = df["AvgYaw"]
 
-        # Plotting
+        # Choose line style: dashed for test trial, solid for others
+        custom_line_dashes = []
+        for label in all_labels:
+            vid = mapping.loc[mapping["display_name"] == label, "video_id"].values[0]
+            if vid == self.test_trial:
+                custom_line_dashes.append("dash")
+            else:
+                custom_line_dashes.append("solid")
+
+        # === Call central plotting function with all visualization & stats options ===
         self.plot_kp(
             df=combined_df,
             y=all_labels,
@@ -1265,7 +1396,7 @@ class HMD_helper:
             xaxis_step=1,
             yaxis_step=0.03,  # type: ignore
             legend_x=0,
-            legend_y=1.225,
+            legend_y=1.0,
             legend_columns=2,
             line_width=3,
             fig_save_width=1470,
@@ -1274,6 +1405,7 @@ class HMD_helper:
             save_file=True,
             save_final=True,
             custom_line_colors=[color_dict.get(label, None) for label in all_labels],
+            custom_line_dashes=custom_line_dashes,
             margin=margin
         )
 
@@ -1391,26 +1523,33 @@ class HMD_helper:
 
     def plot_individual_csvs_barplot(self, csv_paths, mapping_df, font_size=None):
         """
-        Reads three CSV files, extracts the 'average' row, and creates 3 subplots
-        (bar charts), each showing 15 sound clip averages with standard deviation.
+        Reads three CSV files, extracts the 'average' row from each, and generates a 2x2 grid of bar plots.
+        Each bar plot displays the average and standard deviation of 15 sound clips for a different response
+        metric (Noticeability, Informativeness, Annoyance), plus a composite score plot.
 
         Parameters:
-            csv_paths (list of str): List of three file paths to CSVs.
+            csv_paths (list of str): List of three file paths to CSVs. Each CSV must have a row labeled 'average' and per-participant rows.
+            mapping_df (pd.DataFrame): DataFrame mapping 'sound_clip_name' to human-readable 'display_name'.
+            font_size (int, optional): Font size for plot labels and titles.
         """
+
+        # Ensure exactly three CSVs are provided
         if len(csv_paths) != 3:
             raise ValueError("Please provide exactly three CSV file paths.")
 
-        # Load display name mapping
+        # Create mapping from internal sound clip names to display names
         mapping_dict = dict(zip(mapping_df['sound_clip_name'], mapping_df['display_name']))
 
         avgs, stds, all_columns_sets = [], [], []
 
+        # Read and process each CSV file
         for path in csv_paths:
             df = pd.read_csv(path)
             avg_row = df[df['participant_id'] == 'average']
             if avg_row.empty:
                 raise ValueError(f"No 'average' row found in {path}")
 
+            # Exclude 'average' row to compute per-sound-clip std deviation
             numeric_df = df[df['participant_id'] != 'average'].drop(columns='participant_id').astype(float)
             std_row = numeric_df.std()
             avg_row = avg_row.drop(columns='participant_id').iloc[0].astype(float)
@@ -1419,16 +1558,16 @@ class HMD_helper:
             stds.append(std_row)
             all_columns_sets.append(set(numeric_df.columns))
 
-        # Determine sound clips common to all CSVs
+        # Find sound clips present in all three CSVs
         common_cols = set.intersection(*all_columns_sets)
 
-        # Filter and sort mapping_df
+        # Filter and sort mapping_df to retain and order only the common sound clips
         mapping_df = mapping_df[mapping_df['sound_clip_name'].isin(common_cols)]
         sorted_internal_names = mapping_df['sound_clip_name'].tolist()
         sorted_display_names = mapping_df['display_name'].tolist()
         mapping_dict = dict(zip(sorted_internal_names, sorted_display_names))
 
-        # Reorder averages and stds based on mapping order
+        # Reorder averages and stds to match the mapping order
         avgs = [avg[sorted_internal_names] for avg in avgs]
         stds = [std[sorted_internal_names] for std in stds]
 
@@ -1436,11 +1575,11 @@ class HMD_helper:
         display_names = [mapping_dict.get(col, col) for col in columns]
 
         # Compute Composite Score (z-score normalized average with inverted Annoyance)
-        annoyance = avgs[0]
-        info = avgs[1]
-        notice = avgs[2]
+        annoyance = avgs[0]  # First CSV = Annoyance
+        info = avgs[1]  # Second CSV = Informativeness
+        notice = avgs[2]  # Third CSV = Noticeability
 
-        max_scale = 10  # Assumed rating scale
+        max_scale = 10  # Assumed survey/rating scale maximum
         non_annoyance = max_scale - annoyance
 
         z_annoyance = zscore(non_annoyance)
@@ -1450,13 +1589,18 @@ class HMD_helper:
         composite = (z_annoyance + z_info + z_notice) / 3
         composite_std = ((stds[0] + stds[1] + stds[2]) / 3).fillna(0)  # Optional, just for label
 
+        # Prepare plot titles
         subplot_titles = ['Noticeability', 'Informativeness', 'Annoyance', 'Composite score']
+
+        # Create 2x2 subplots
         fig = make_subplots(rows=2, cols=2, subplot_titles=subplot_titles, vertical_spacing=0.3)
-        # Make subplot titles larger
+
+        # Adjust subplot title font sizes
         for annotation in fig['layout']['annotations']:  # type: ignore
             annotation['font'] = dict(size=font_size or common.get_configs('font_size'),  # type: ignore
                                       family=common.get_configs('font_family'))
 
+        # Prepare data for each subplot: means and standard deviations
         data_to_plot = [
             (avgs[0], stds[0]),
             (avgs[1], stds[1]),
@@ -1464,6 +1608,7 @@ class HMD_helper:
             (composite, composite_std)
         ]
 
+        # Add each subplot's barplot
         for i, (means, deviations) in enumerate(data_to_plot):
             row = (i // 2) + 1
             col = (i % 2) + 1
@@ -1479,6 +1624,7 @@ class HMD_helper:
                 col=col
             )
 
+            # Annotate each bar with mean and std (as text)
             for x_val, y_val, m, d in zip(display_names, means, means, deviations):
                 fig.add_annotation(
                     text=f"{m:.2f} ({d:.2f})",
@@ -1492,10 +1638,11 @@ class HMD_helper:
                     row=row,
                     col=col
                 )
-            # hardcode ylim for the first 3 plots
+            # Fix y-axis range for the first 3 subplots
             if i < 3:
                 fig.update_yaxes(range=[0, 12], row=row, col=col)
 
+        # Update figure layout and style
         fig.update_layout(
             font=dict(size=font_size or common.get_configs('font_size'), family=common.get_configs('font_family')),
             height=1200,
@@ -1505,6 +1652,8 @@ class HMD_helper:
         )
 
         fig.update_xaxes(tickangle=45)
+
+        # Save the resulting figure
         self.save_plotly(fig,
                          'bar_response',
                          height=1200,
@@ -1512,64 +1661,61 @@ class HMD_helper:
                          save_final=True)
 
     def plot_yaw_histogram(self, mapping, angle=180, data_folder='_output', num_bins=None,
-                           smoothen_filter_param=False, calibrate=False):
+                           smoothen_filter_param=False):
         """
-        Plots histogram of average yaw angles across participants for each trial.
+        Plots a histogram of average yaw angles for each trial across participants.
+
+        This function loads yaw angle data from text files for different trials, optionally smooths the data,
+        and plots histograms for each trial on a shared figure. Each line represents the distribution of yaw
+        angles for a single trial.
 
         Parameters:
-            - mapping: DataFrame or data structure used to map trial identifiers to names
-            - angle (int): The range of yaw angles to consider (-angle to +angle)
-            - data_folder (str): Path to the folder containing CSV files named like 'participant_Yaw_trial_*.csv'
-            - num_bins (int, optional): Number of bins to use in the histogram. Defaults to 2*angle.
+            mapping (DataFrame): A data structure (e.g., pandas DataFrame) mapping trial identifiers to display names.
+            angle (int, optional): The yaw angle range considered for the histogram, from -angle to +angle. Default is 180.
+            data_folder (str, optional): Path to the folder containing the yaw angle data files. Default is '_output'.
+            num_bins (int, optional): Number of bins for the histogram. If None, defaults to 2 * angle.
+            smoothen_filter_param (bool, optional): Whether to smooth the yaw data using a filter (e.g., OneEuroFilter).
         """
 
-        all_files = glob.glob(os.path.join(data_folder, 'participant_Yaw_trial_*'))
-        file_paths = sorted([
-            f for f in all_files
-            if re.match(r'.*participant_Yaw_trial_\d+\.csv$', os.path.basename(f))
+        # Find all yaw angle text files in the data folder
+        txt_files = glob.glob(os.path.join(data_folder, 'yaw_values_*.txt'))
+        txt_files = sorted(txt_files)  # Ensure a consistent order
 
-        ])
-
-        fig = go.Figure()
-
+        fig = go.Figure()  # Initialise the plotly figure
         if num_bins is None:
-            num_bins = 2 * angle
+            num_bins = 2 * angle  # Default bin count
 
-        for file_path in file_paths:
-            df = pd.read_csv(file_path)
-
-            participant_cols = [col for col in df.columns if col.startswith('P')]
-            if not participant_cols:
+        for file_path in txt_files:
+            # Extract the trial id from the filename
+            match = re.search(r'yaw_values_(.+)\.txt', os.path.basename(file_path))
+            if not match:
                 continue
+            trial_id = match.group(1)
 
-            avg_yaw = df[participant_cols].mean(axis=1, skipna=True).dropna()
+            # Get the human-readable trial name using the mapping DataFrame
+            display_name = self.get_sound_clip_name(df=mapping, video_id_value=trial_id)
 
-            if calibrate:
-                calibrated_yaw = avg_yaw - avg_yaw.iloc[0]
-                yaw_deg = np.degrees(calibrated_yaw)
+            # Load all yaw values for the trial from file
+            yaw_values = np.loadtxt(file_path)
 
-            else:
-                yaw_deg = np.degrees(avg_yaw)
+            # Convert to degrees (if not already in deg)
+            yaw_deg = np.degrees(yaw_values)
 
-            # Apply smoothing
+            # Smoothing (optional)
             if smoothen_filter_param:
                 yaw_deg = self.smoothen_filter(yaw_deg.tolist(), type_flter='OneEuroFilter')
                 yaw_deg = np.array(yaw_deg)
 
+            # Keep only angles within the specified range
             filtered = yaw_deg[(yaw_deg >= -angle) & (yaw_deg <= angle)]
             if len(filtered) == 0:
-                continue
+                continue  # Skip if no data falls within the range
 
+            # Compute histogram for the current trial
             hist, bins = np.histogram(filtered, bins=num_bins, range=(-angle, angle), density=True)
             bin_centers = 0.5 * (bins[:-1] + bins[1:])
 
-            match = re.search(r"(trial_\d+)", file_path)
-
-            if match:
-                trial_info = match.group(1)
-
-            # Use custom display name if function is provided
-            display_name = self.get_sound_clip_name(df=mapping, video_id_value=trial_info)
+            # Add the histogram as a line to the plot
             fig.add_trace(go.Scatter(
                 x=bin_centers,
                 y=hist,
@@ -1578,13 +1724,20 @@ class HMD_helper:
                 line=dict(width=2)
             ))
 
-        fig.add_vline(x=0, line=dict(dash='dash', color='gray'), annotation_text="0°", annotation_position="top")
+        # Add a vertical dashed line at 0 degrees (center)
+        fig.add_vline(x=0, line=dict(dash='dash',
+                                     color='gray'),
+                      annotation_text="0°",
+                      annotation_position="top")
 
+        # Set up axis labels, tick values, legend, and overall plot style
         fig.update_layout(
-            xaxis_title='Average gaze yaw angle (deg)',
+            xaxis_title='Yaw angle (deg)',
             yaxis_title='Frequency',
-            xaxis=dict(tickmode='array',
-                       tickvals=[-angle, -(2*angle/3), -(angle/3), 0, (angle/3), ((2*angle/3)), 180]),
+            xaxis=dict(
+                tickmode='array',
+                tickvals=[-angle, -(2*angle/3), -(angle/3), 0, (angle/3), ((2*angle/3)), angle]
+            ),
             legend=dict(font=dict(size=20)),
             width=1400,
             height=800,
@@ -1593,4 +1746,5 @@ class HMD_helper:
             margin=dict(t=60, b=60, l=60, r=60)
         )
 
-        self.save_plotly(fig, 'yaw_histogram', save_final=True)
+        # Save the generated plot using a helper function
+        self.save_plotly(fig, 'yaw_histogram_from_txts', save_final=True)

@@ -3,19 +3,69 @@ import math
 import numpy as np
 import pandas as pd
 import os
+import ast
 from collections import defaultdict
 
 logger = CustomLogger(__name__)  # use custom logger
 
 
 class HMD_yaw():
+    """
+        A utility class for processing and analysing quaternion-based head-mounted display (HMD) orientation data.
+
+        This class provides methods to:
+            - Convert quaternions to Euler angles (roll, pitch, yaw) for easy interpretation and downstream analysis.
+            - Average multiple quaternions using Markley's method via eigen decomposition,
+                yielding robust mean orientations.
+            - Compute average yaw angles per timestamp from participant matrix CSV files.
+            - Group files by video_id from a data directory tree, supporting experiments
+                organised by video segments or trials.
+
+        Typical use cases include:
+            - Preprocessing HMD orientation data for VR/AR experiments.
+            - Aggregating orientation data across multiple users or time windows.
+            - Batch operations over experiment directories.
+
+        Methods:
+            - quaternion_to_euler(w, x, y, z): Converts a single quaternion to Euler angles (roll, pitch, yaw).
+            - average_quaternions_eigen(quaternions): Computes the average quaternion from a list.
+            - compute_avg_yaw_from_matrix_csv(input_csv, output_csv=None): Computes average yaw per timestamp
+                and saves (optionally) as CSV.
+            - group_files_by_video_id(data_folder, video_data): Groups CSV files in a directory tree by their video_id.
+
+        Notes:
+            - Assumes quaternions use scalar-first format [w, x, y, z].
+            - Relies on pandas, numpy, ast, os, math, and collections.defaultdict.
+            - The CSV parsing logic assumes columns contain string representations of quaternion lists.
+
+        Example:
+            >>> hmd = HMD_yaw()
+            >>> roll, pitch, yaw = hmd.quaternion_to_euler(w, x, y, z)
+            >>> avg_quat = hmd.average_quaternions_eigen(list_of_quats)
+            >>> avg_yaw_df = hmd.compute_avg_yaw_from_matrix_csv('input.csv', 'output.csv')
+            >>> grouped_files = hmd.group_files_by_video_id('data/', video_data_df)
+        """
+
     def __init__(self) -> None:
         pass
 
     def quaternion_to_euler(self, w, x, y, z):
         """
-        Convert a quaternion into Euler angles (roll, pitch, yaw)
-        Roll is rotation around x-axis, pitch is rotation around y-axis, and yaw is rotation around z-axis.
+        Converts a quaternion (w, x, y, z) into Euler angles (roll, pitch, yaw).
+
+        The resulting angles are in radians:
+            - Roll: rotation around the x-axis
+            - Pitch: rotation around the y-axis
+            - Yaw: rotation around the z-axis
+
+        Parameters:
+            w (float): The scalar component of the quaternion.
+            x (float): The x-component of the quaternion.
+            y (float): The y-component of the quaternion.
+            z (float): The z-component of the quaternion.
+
+        Returns:
+            tuple: (roll, pitch, yaw) in radians.
         """
         # Roll (x-axis rotation)
         sinr_cosp = 2 * (w * x + y * z)
@@ -25,7 +75,8 @@ class HMD_yaw():
         # Pitch (y-axis rotation)
         sinp = 2 * (w * y - z * x)
         if abs(sinp) >= 1:
-            pitch = math.copysign(math.pi / 2, sinp)  # Use 90 degrees if out of range
+            # Use 90 degrees if out of range (to handle numerical imprecision)
+            pitch = math.copysign(math.pi / 2, sinp)
         else:
             pitch = math.asin(sinp)
 
@@ -39,13 +90,25 @@ class HMD_yaw():
 
     def average_quaternions_eigen(self, quaternions):
         """
-        Average a list of quaternions using Markley's method (via eigen decomposition:https://doi.org/10.2514/1.28949).
+        Averages a list of quaternions using Markley's method via eigen decomposition.
+
+        Markley's method (see: https://doi.org/10.2514/1.28949) computes the quaternion mean
+        that minimises the sum of squared distances on the unit hypersphere, ensuring a robust
+        and well-defined average for rotations.
 
         Args:
-            quaternions (List[List[float]]): List of [w, x, y, z] quaternions.
+            quaternions (List[List[float]]): List of quaternions, each as [w, x, y, z].
 
         Returns:
-            np.ndarray: Averaged quaternion as [w, x, y, z]
+            np.ndarray: The average quaternion as a numpy array [w, x, y, z].
+
+        Raises:
+            ValueError: If the input list is empty.
+
+        Notes:
+            - All input quaternions should be unit quaternions (normalised). This function will
+            normalise them if they are not.
+            - The sign of the output is chosen so the scalar component (w) is non-negative.
         """
         if len(quaternions) == 0:
             raise ValueError("No quaternions to average.")
@@ -55,7 +118,7 @@ class HMD_yaw():
         # Convert to numpy array and ensure shape (N, 4)
         q_arr = np.array(quaternions)
 
-        # Normalize each quaternion to unit length
+        # Normalise each quaternion to unit length
         q_arr = np.array([q / np.linalg.norm(q) for q in q_arr])
 
         # Ensure quaternions are all in the same hemisphere
@@ -71,7 +134,7 @@ class HMD_yaw():
             q = q.reshape(4, 1)  # Make column vector
             A += q @ q.T         # Outer product
 
-        # Normalize by number of quaternions (optional)
+        # Normalise by number of quaternions (optional)
         A /= len(q_arr)
 
         # Eigen decomposition
@@ -80,67 +143,106 @@ class HMD_yaw():
 
         # Ensure scalar-first order: [w, x, y, z]
         return avg_q if avg_q[0] >= 0 else -avg_q  # Normalise sign
-    
-    def compute_yaw_from_quaternions(self, data_folder, video_id, mapping, output_file):
+
+    def compute_avg_yaw_from_matrix_csv(self, input_csv, output_csv=None):
         """
-        Computes the average yaw angle per timestamp using quaternions for a given video_id.
+        Computes the average yaw angle for each timestamp in a CSV containing participant quaternion matrices.
+
+        For each row (timestamp), this method:
+            - Parses all participant quaternion lists
+            - Averages all quaternions (using Markley's method)
+            - Converts the average quaternion to Euler angles
+            - Extracts the yaw (rotation about z-axis)
 
         Args:
-            data_folder (str): Base folder where participant CSVs are stored.
-            video_id (str): The video ID to process.
-            mapping (pd.DataFrame): Mapping file that includes video lengths.
-            output_file (str): Path to output CSV with average yaw angle.
+            input_csv (str): Path to the input CSV file. Must contain 'Timestamp' and participant columns
+                             with string-encoded lists of quaternions (each as [w, x, y, z]).
+            output_csv (str, optional): If set, saves the resulting DataFrame to this path as CSV.
+
+        Returns:
+            pd.DataFrame: DataFrame with columns ['Timestamp', 'AvgYaw'].
+
+        Notes:
+            - Requires 'average_quaternions_eigen' and 'quaternion_to_euler' methods to be defined on self.
+            - Returns yaw in radians.
+            - If a row has no quaternions, 'AvgYaw' is set to None for that timestamp.
         """
-        grouped_data = self.group_files_by_video_id(data_folder, mapping)
-        files = grouped_data.get(video_id, [])
+        df = pd.read_csv(input_csv)
+        # Identify participant columns (assumed to be all except 'Timestamp')
+        participant_cols = [col for col in df.columns if col != "Timestamp"]
 
-        if not files:
-            logger.warning(f"No CSV files found for video_id={video_id}")
-            return
+        results = []
 
-        all_data = []
+        # Iterate over each timestamp/row in the CSV
+        for idx, row in df.iterrows():
+            all_quats = []
 
-        video_length_row = mapping.loc[mapping["video_id"] == video_id, "video_length"]
-        if video_length_row.empty:
-            logger.warning(f"Video length not found in mapping for video_id={video_id}")
-            return
-        video_length = video_length_row.values[0] / 1000  # Convert ms to seconds
+            # Gather all quaternions for this timestamp from all participants
+            for col in participant_cols:
+                try:
+                    # Parse the string-encoded list of quaternions
+                    quats = ast.literal_eval(row[col])
+                    # Ensure it's a non-empty list before adding
+                    if isinstance(quats, list) and len(quats) > 0:
+                        all_quats.extend(quats)
+                except Exception:
+                    # Ignore parsing errors (e.g., malformed data)
+                    continue
 
-        for file_path in files:
-            df = pd.read_csv(file_path)
-            required_cols = {"Timestamp", "HMDRotationW", "HMDRotationX", "HMDRotationY", "HMDRotationZ"}
-            if not required_cols.issubset(df.columns):
-                continue
+            # If we found at least one quaternion, compute the average and yaw
+            if all_quats:
+                avg_quat = self.average_quaternions_eigen(all_quats)
+                roll, pitch, yaw = self.quaternion_to_euler(*avg_quat)
+                results.append({'Timestamp': row["Timestamp"], 'AvgYaw': yaw})
+            else:
+                # If no quaternions, set AvgYaw as None
+                results.append({'Timestamp': row["Timestamp"], 'AvgYaw': None})
 
-            df = df[(df["Timestamp"] >= 0) & (df["Timestamp"] <= video_length + 0.01)]
-            df["Timestamp"] = ((df["Timestamp"] / 0.02).round() * 0.02).astype(float)
+        # Convert the results to a DataFrame
+        out_df = pd.DataFrame(results)
 
-            grouped = df.groupby("Timestamp")[["HMDRotationW", "HMDRotationX", "HMDRotationY", "HMDRotationZ"]].apply(
-                lambda group: self.quaternion_to_euler(*self.average_quaternions_eigen(group.values))[2]  # yaw
-            ).reset_index(name="Yaw")
-            all_data.append(grouped)
+        # Save to CSV if an output path was provided
+        if output_csv is not None:
+            out_df.to_csv(output_csv, index=False)
 
-        if not all_data:
-            logger.warning(f"No valid quaternion data for video_id={video_id}")
-            return
-
-        avg_df = pd.concat(all_data).groupby("Timestamp", as_index=False).mean()
-        avg_df.to_csv(output_file, index=False)
-        logger.info(f"Averaged yaw angle saved to: {output_file}")
+        return out_df
 
     def group_files_by_video_id(self, data_folder, video_data):
-        # Read the main CSV to map video_id
+        """
+        Groups CSV file paths from a directory tree by their associated video_id.
+
+        This method traverses a data folder (including all subdirectories), searching for .csv files.
+        Each file is expected to be named in a format containing an underscore and a video_id
+        (e.g., "prefix_something_videoid.csv"). Only files whose video_id matches one of the IDs in
+        the provided video_data DataFrame will be grouped.
+
+        Args:
+            data_folder (str): Path to the root data folder containing CSV files.
+            video_data (pd.DataFrame): DataFrame with a 'video_id' column listing valid video IDs.
+
+        Returns:
+            defaultdict: Dictionary mapping each video_id to a list of CSV file paths containing that ID.
+
+        Notes:
+            - Assumes filenames are structured with underscores, with the video_id
+                after the last underscore (before '.csv').
+            - Ignores files whose video_id is not present in video_data['video_id'].
+            - Recurses into all subfolders of data_folder.
+        """
+
+        # Extract unique video IDs from the DataFrame
         video_ids = video_data['video_id'].unique()
 
-        grouped_data = defaultdict(list)
+        grouped_data = defaultdict(list)  # Dictionary to group file paths by video_id
 
         # Traverse through the data folder and its subfolders
         for root, _, files in os.walk(data_folder):
             for file in files:
                 if file.endswith('.csv'):
-                    # Extract the part of the filename after '_'
+                    # Split filename by underscores; expect at least three parts for a video_id
                     file_parts = file.split('_', maxsplit=2)
                     if len(file_parts) > 2:
+                        # Extract video_id from the last segment, before '.csv'
                         file_video_id = file_parts[-1].split('.')[0]  # Extract video_id
                         if file_video_id in video_ids:
                             full_path = os.path.join(root, file)

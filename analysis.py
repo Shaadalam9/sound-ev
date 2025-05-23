@@ -77,8 +77,8 @@ if __name__ == "__main__":
                     margin=dict(l=80, r=2, t=12, b=12))
 
     # Head rotation
-    HMD.plot_yaw(mapping, margin=dict(l=100, r=2, t=12, b=12))
-    HMD.plot_yaw_histogram(mapping, angle=10, num_bins=30, calibrate=False, smoothen_filter_param=False)
+    HMD.plot_yaw(mapping, margin=dict(l=100, r=2, t=10, b=10))
+    HMD.plot_yaw_histogram(mapping, angle=30, num_bins=30, smoothen_filter_param=True)
 
     # Subjective responses
     HMD.plot_individual_csvs(["_output/slider_input_noticeability.csv",
