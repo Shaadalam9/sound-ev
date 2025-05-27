@@ -777,7 +777,7 @@ class HMD_helper:
                          ttest_marker_size, ttest_marker_colour, ttest_annotations_font_size, ttest_annotations_colour,
                          anova_signals, anova_marker, anova_marker_size, anova_marker_colour,
                          anova_annotations_font_size, anova_annotations_colour, ttest_anova_row_height,
-                         ttest_annotation_x, flag_trigger):
+                         ttest_annotation_x, flag_trigger=False):
         """Draw ttest and anova test rows.
 
         Args:
@@ -831,7 +831,11 @@ class HMD_helper:
                     xs, ys = [], []
                     # hardcoding margin from the x
                     # todo: hardcoding value of margin
-                    y_offset = original_min - ttest_anova_row_height * (counter_ttest + 1) - 5
+                    if flag_trigger:
+                        y_offset = original_min - ttest_anova_row_height * (counter_ttest + 1) - 5
+                    else:
+                        y_offset = original_min - (ttest_anova_row_height * (counter_ttest + 1)) + 0.15
+
                     for i, s in enumerate(sig):
                         if s:
                             xs.append(times[i])
@@ -841,7 +845,7 @@ class HMD_helper:
                         fig.add_annotation(
                             x=x,
                             y=y,
-                            text='*',  # todo: use ttest_marker
+                            text='*',  # TODO: use ttest_marker
                             showarrow=False,
                             yanchor='middle',
                             font=dict(family=common.get_configs("font_family"),
@@ -850,6 +854,7 @@ class HMD_helper:
                             hovertext=f"{comp['label']}: time={x}, p={p_val}",
                             hoverlabel=dict(bgcolor="white"),
                         )
+
                     # label row
                     fig.add_annotation(x=ttest_annotation_x,
                                        y=y_offset,
@@ -1225,8 +1230,8 @@ class HMD_helper:
             y_legend_kp=all_labels,
             yaxis_range=yaxis_range,
             xaxis_range=xaxis_range,
-            xaxis_title=xaxis_title,
-            yaxis_title=yaxis_title,
+            xaxis_title=xaxis_title,  # type: ignore
+            yaxis_title=yaxis_title,  # type: ignore
             xaxis_title_offset=-0.04,  # type: ignore
             yaxis_title_offset=0.18,  # type: ignore
             name_file=f"all_videos_kp_slider_plot_{column_name}",
@@ -1390,8 +1395,8 @@ class HMD_helper:
             y_legend_kp=all_labels,
             xaxis_range=xaxis_range,
             yaxis_range=yaxis_range,
-            xaxis_title=xaxis_title,
-            yaxis_title=yaxis_title,
+            xaxis_title=xaxis_title,  # type: ignore
+            yaxis_title=yaxis_title,  # type: ignore
             xaxis_title_offset=-0.047,  # type: ignore
             # yaxis_title_offset=0.17,  # type: ignore
             name_file=f"all_videos_yaw_angle_{column_name}",
@@ -1419,6 +1424,7 @@ class HMD_helper:
             save_final=True,
             custom_line_colors=[color_dict.get(label, None) for label in all_labels],
             custom_line_dashes=custom_line_dashes,
+            flag_trigger=False,
             margin=margin
         )
 
@@ -1541,7 +1547,8 @@ class HMD_helper:
         metric (Noticeability, Informativeness, Annoyance), plus a composite score plot.
 
         Parameters:
-            csv_paths (list of str): List of three file paths to CSVs. Each CSV must have a row labeled 'average' and per-participant rows.
+            csv_paths (list of str): List of three file paths to CSVs. Each CSV must have a row labeled
+                'average' and per-participant rows.
             mapping_df (pd.DataFrame): DataFrame mapping 'sound_clip_name' to human-readable 'display_name'.
             font_size (int, optional): Font size for plot labels and titles.
         """
@@ -1684,10 +1691,12 @@ class HMD_helper:
 
         Parameters:
             mapping (DataFrame): A data structure (e.g., pandas DataFrame) mapping trial identifiers to display names.
-            angle (int, optional): The yaw angle range considered for the histogram, from -angle to +angle. Default is 180.
+            angle (int, optional): The yaw angle range considered for the histogram, from -angle to +angle.
+                Default is 180.
             data_folder (str, optional): Path to the folder containing the yaw angle data files. Default is '_output'.
             num_bins (int, optional): Number of bins for the histogram. If None, defaults to 2 * angle.
-            smoothen_filter_param (bool, optional): Whether to smooth the yaw data using a filter (e.g., OneEuroFilter).
+            smoothen_filter_param (bool, optional): Whether to smooth the yaw data using a filter
+                (e.g., OneEuroFilter).
         """
 
         # Find all yaw angle text files in the data folder

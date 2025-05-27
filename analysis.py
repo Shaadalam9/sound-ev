@@ -65,7 +65,7 @@ if __name__ == "__main__":
     logger.info("Analysis started.")
 
     # Read and process data
-    # HMD.read_slider_data(data_folder, mapping, output_folder)
+    HMD.read_slider_data(data_folder, mapping, output_folder)
 
     # Keypress data
     HMD.plot_column(mapping,
@@ -83,32 +83,32 @@ if __name__ == "__main__":
                  xaxis_title="Time, [s]",
                  yaxis_title="Yaw angle, [radian]",
                  margin=dict(l=100, r=2, t=10, b=10))
-    # HMD.plot_yaw_histogram(mapping, angle=30, num_bins=30, smoothen_filter_param=True)
+    HMD.plot_yaw_histogram(mapping, angle=30, num_bins=30, smoothen_filter_param=True)
 
     # Subjective responses
     HMD.plot_individual_csvs(["_output/slider_input_noticeability.csv",
                               "_output/slider_input_info.csv",
                               "_output/slider_input_annoyance.csv"
                               ], mapping)
-    # HMD.plot_individual_csvs_barplot(["_output/slider_input_noticeability.csv",
-    #                                   "_output/slider_input_info.csv",
-    #                                   "_output/slider_input_annoyance.csv"
-    #                                   ], mapping)
+    HMD.plot_individual_csvs_barplot(["_output/slider_input_noticeability.csv",
+                                      "_output/slider_input_info.csv",
+                                      "_output/slider_input_annoyance.csv"
+                                      ], mapping)
 
     # # Information on participants
-    # HMD.plot_column_distribution(intake_questionnaire,
-    #                              intake_columns_to_plot,
-    #                              output_folder="output",
-    #                              save_file=True)
-    # HMD.plot_column_distribution(post_experiment_questionnaire,
-    #                              post_columns_to_plot,
-    #                              output_folder="output",
-    #                              save_file=True)
-    # HMD.distribution_plots(intake_questionnaire,
-    #                        intake_columns_distribution_to_plot,
-    #                        output_folder="output",
-    #                        save_file=True)
-    # HMD.distribution_plots(post_experiment_questionnaire,
-    #                        post_columns_distribution_to_plot,
-    #                        output_folder="output",
-    #                        save_file=True)
+    HMD.plot_column_distribution(intake_questionnaire,
+                                 intake_columns_to_plot,
+                                 output_folder="output",
+                                 save_file=True)
+    HMD.plot_column_distribution(post_experiment_questionnaire,
+                                 post_columns_to_plot,
+                                 output_folder="output",
+                                 save_file=True)
+    HMD.distribution_plots(intake_questionnaire,
+                           intake_columns_distribution_to_plot,
+                           output_folder="output",
+                           save_file=True)
+    HMD.distribution_plots(post_experiment_questionnaire,
+                           post_columns_distribution_to_plot,
+                           output_folder="output",
+                           save_file=True)
