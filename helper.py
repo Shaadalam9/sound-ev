@@ -80,7 +80,7 @@ class HMD_helper:
 
         Parameters:
             df (DataFrame or str): DataFrame or path to CSV.
-            columns (list): List of column names to analyze.
+            columns (list): List of column names to analyse.
             output_folder (str): Folder where plots will be saved.
             save_file (bool): Whether to save plots or just show them.
         """
@@ -334,7 +334,7 @@ class HMD_helper:
                 custom_line_colors=None, custom_line_dashes=None, flag_trigger=False, margin=None):
         """
         Plots keypress (response) data from a dataframe using Plotly, with options for custom lines,
-        annotations, t-test and ANOVA result overlays, event markers, and customizable styling and saving.
+        annotations, t-test and ANOVA result overlays, event markers, and customisable styling and saving.
 
 
         Args:
@@ -355,7 +355,7 @@ class HMD_helper:
             xaxis_range (list or None, optional): Range of x axis in format [min, max] for keypress plot.
             yaxis_range (list or None, optional): Range of y axis in format [min, max] for keypress plot.
             stacked (bool, optional): Whether to show bars as stacked chart.
-            pretty_text (bool, optional): Prettify tick labels by replacing underscores with spaces and capitalizing.
+            pretty_text (bool, optional): Prettify tick labels by replacing underscores with spaces and capitalising.
             orientation (str, optional): Orientation of bars; 'v' = vertical, 'h' = horizontal.
             show_text_labels (bool, optional): Whether to output automatically positioned text labels.
             name_file (str, optional): Name of file to save.
@@ -1436,6 +1436,15 @@ class HMD_helper:
         Sound clip order and display names are taken from the mapping_df. Only clips found in all
         CSV files will be plotted. Colors are set based on a user-defined color_dict.
 
+        Composite Score Calculation:
+            The composite score is calculated for each sound clip and participant as follows:
+            1. Invert the Annoyance score (higher Annoyance = worse) by subtracting each value
+                from the maximum scale value (e.g., 10).
+            2. Standardise each metric (inverted Annoyance, Informativeness, Noticeability) using z-scores.
+            3. Average the three standardised values (equal weighting) to form a single composite score per response.
+            This approach is based on the SUM (Single Usability Metric) methodology described
+                by Sauro & Kindlund (2005) (https://doi.org/10.1145/1054972.1055028).
+
         Parameters:
             csv_paths (list of str): List of three CSV file paths in the order:
                                      [Annoyance, Informativeness, Noticeability].
@@ -1444,6 +1453,7 @@ class HMD_helper:
             font_size (int, optional): Font size for figure text.
             color_dict (dict, optional): Dictionary mapping display names to specific plot colors.
         """
+
         if len(csv_paths) != 3:
             raise ValueError("Please provide exactly three CSV file paths.")
 
@@ -1488,7 +1498,8 @@ class HMD_helper:
         plot_data = all_data + [composite]
 
         # Define subplot layout and titles
-        subplot_titles = ['Noticeability', 'Informativeness', 'Annoyance', 'Composite score']
+        subplot_titles = ['Annoyance', 'Informativeness', 'Noticeability', 'Composite score']
+
         fig = make_subplots(rows=2, cols=2, subplot_titles=subplot_titles, vertical_spacing=0.25)
 
         # Set subplot title font sizes
@@ -1546,6 +1557,15 @@ class HMD_helper:
         Each bar plot displays the average and standard deviation of 15 sound clips for a different response
         metric (Noticeability, Informativeness, Annoyance), plus a composite score plot.
 
+        Composite Score Calculation:
+            The composite score is calculated for each sound clip as follows:
+            1. Invert the Annoyance mean (higher Annoyance = worse) by subtracting each value from the
+                maximum scale value (e.g., 10).
+            2. Standardise the mean values of each metric (inverted Annoyance, Informativeness, Noticeability)
+                using z-scores.
+            3. Average the three standardised values (equal weighting) to form a single composite score per sound clip.
+            This process follows the Single Usability Metric (SUM) methodology by Sauro & Kindlund (2005).
+
         Parameters:
             csv_paths (list of str): List of three file paths to CSVs. Each CSV must have a row labeled
                 'average' and per-participant rows.
@@ -1594,7 +1614,7 @@ class HMD_helper:
         columns = avgs[0].index.tolist()
         display_names = [mapping_dict.get(col, col) for col in columns]
 
-        # Compute Composite Score (z-score normalized average with inverted Annoyance)
+        # Compute Composite Score (z-score normalised average with inverted Annoyance)
         annoyance = avgs[0]  # First CSV = Annoyance
         info = avgs[1]  # Second CSV = Informativeness
         notice = avgs[2]  # Third CSV = Noticeability
@@ -1610,7 +1630,7 @@ class HMD_helper:
         composite_std = ((stds[0] + stds[1] + stds[2]) / 3).fillna(0)  # Optional, just for label
 
         # Prepare plot titles
-        subplot_titles = ['Noticeability', 'Informativeness', 'Annoyance', 'Composite score']
+        subplot_titles = ['Annoyance', 'Informativeness', 'Noticeability', 'Composite score']
 
         # Create 2x2 subplots
         fig = make_subplots(rows=2, cols=2, subplot_titles=subplot_titles, vertical_spacing=0.3)

@@ -86,16 +86,17 @@ if __name__ == "__main__":
     HMD.plot_yaw_histogram(mapping, angle=30, num_bins=30, smoothen_filter_param=True)
 
     # Subjective responses
-    HMD.plot_individual_csvs(["_output/slider_input_noticeability.csv",
-                              "_output/slider_input_info.csv",
-                              "_output/slider_input_annoyance.csv"
+    HMD.plot_individual_csvs(["_output/slider_input_annoyance.csv",         # Annoyance
+                              "_output/slider_input_info.csv",              # Informativeness
+                              "_output/slider_input_noticeability.csv"      # Noticeability
                               ], mapping)
-    HMD.plot_individual_csvs_barplot(["_output/slider_input_noticeability.csv",
-                                      "_output/slider_input_info.csv",
-                                      "_output/slider_input_annoyance.csv"
+
+    HMD.plot_individual_csvs_barplot(["_output/slider_input_annoyance.csv",        # Annoyance
+                                      "_output/slider_input_info.csv",             # Informativeness
+                                      "_output/slider_input_noticeability.csv"     # Noticeability
                                       ], mapping)
 
-    # # Information on participants
+    # Information on participants
     HMD.plot_column_distribution(intake_questionnaire,
                                  intake_columns_to_plot,
                                  output_folder="output",
