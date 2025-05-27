@@ -74,9 +74,19 @@ Configuration of the project needs to be defined in `sound-ev/config`. Please us
 * `mapping`: CSV file that contains all data found in the videos.
 * `plotly_template`: template used to make graphs in the analysis.
 * `output`: folder with output.
+* `figures`: folder with final figures.
 * `data`: folder with data.
-* `input_csv`: data from intake questionnaire.
-* `post_input_csv`: data from final questionnaire.
+* `intake_questionnaire`: data from intake questionnaire.
+* `post_experiment_questionnaire`: data from final questionnaire.
+* `kp_resolution`: bin size in ms in which keypress data is stored.
+* `yaw_resolution`: bin size in ms in which yaw data is stored..
+* `smoothen_signal`: toggle to apply filter to smoothen data.,
+* `freq`: frequency used by One Euro Filter.
+* `mincutoff`: minimal cutoff used by One Euro Filter.
+* `beta`: beta value used by One Euro Filter.
+* `font_family`: font family to be used on the figures.
+* `font_size`: font size to be used on the figures.
+* `p_value`: p value used for ttest.
 
 ## Input
 The simulator takes input from Meta Quest controller.

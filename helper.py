@@ -703,7 +703,7 @@ class HMD_helper:
         grouped_data = HMD_class.group_files_by_video_id(data_folder, mapping)
 
         # calculate resolution based on the param in
-        resolution = common.get_configs("yaw_kp_resolution") / 1000.0
+        resolution = common.get_configs("yaw_resolution") / 1000.0
 
         # Process each video ID and its associated files
         logger.info("Exporting CSV files.")
@@ -807,9 +807,9 @@ class HMD_helper:
 
         # calculate resolution based on the param
         if flag_trigger:
-            resolution = common.get_configs("trigger_kp_resolution") / 1000.0
+            resolution = common.get_configs("kp_resolution") / 1000.0
         else:
-            resolution = common.get_configs("yaw_kp_resolution") / 1000.0
+            resolution = common.get_configs("yaw_resolution") / 1000.0
 
         # --- t-test markers ---
         if ttest_signals:
@@ -976,7 +976,7 @@ class HMD_helper:
         all_timestamps = set()     # Collect all observed timestamps for alignment
 
         # Calculate time bin resolution (in seconds) from config
-        resolution = common.get_configs("trigger_kp_resolution") / 1000.0
+        resolution = common.get_configs("kp_resolution") / 1000.0
 
         # Iterate over participant folders
         for folder in sorted(os.listdir(data_folder)):
@@ -1048,7 +1048,7 @@ class HMD_helper:
         all_timestamps = set()  # Collect all timestamps observed
 
         # Bin size for timestamps (in seconds)
-        resolution = common.get_configs("yaw_kp_resolution") / 1000.0
+        resolution = common.get_configs("yaw_resolution") / 1000.0
 
         # Iterate over all participant folders in the data directory
         for folder in sorted(os.listdir(data_folder)):
