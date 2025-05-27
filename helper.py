@@ -572,7 +572,7 @@ class HMD_helper:
                                           y=legend_y,
                                           bgcolor='rgba(0,0,0,0)',
                                           font=dict(family=font_family,
-                                                    size=font_size or common.get_configs('font_size'))))
+                                                    size=font_size or common.get_configs('font_size') - 6)))
 
         # multiple columns
         elif legend_columns == 2:
@@ -619,7 +619,7 @@ class HMD_helper:
         if save_file:
             self.save_plotly(fig=fig,
                              name=name_file,
-                             remove_margins=True,
+                             remove_margins=False,
                              width=fig_save_width,
                              height=fig_save_height,
                              save_final=save_final)  # also save as "final" figure
@@ -799,6 +799,8 @@ class HMD_helper:
             anova_annotations_colour (str): colour of annotations for ANOVA.
             ttest_anova_row_height (int): height of row of ttest/anova markers.
         """
+        # todo: anova support is broken after migration from original code
+        # todo: when no markers are to be shown, empty space is still added to the y axis
         # Save original axis limits
         original_min, original_max = yaxis_range
         # Counters for marker rows
@@ -827,7 +829,9 @@ class HMD_helper:
 
                 if any(sig):
                     xs, ys = [], []
-                    y_offset = original_min - ttest_anova_row_height * (counter_ttest + 1)
+                    # hardcoding margin from the x
+                    # todo: hardcoding value of margin
+                    y_offset = original_min - ttest_anova_row_height * (counter_ttest + 1) - 5
                     for i, s in enumerate(sig):
                         if s:
                             xs.append(times[i])
@@ -837,8 +841,9 @@ class HMD_helper:
                         fig.add_annotation(
                             x=x,
                             y=y,
-                            text='*',
+                            text='*',  # todo: use ttest_marker
                             showarrow=False,
+                            yanchor='middle',
                             font=dict(family=common.get_configs("font_family"),
                                       size=ttest_marker_size,
                                       color=ttest_marker_colour),
@@ -857,14 +862,15 @@ class HMD_helper:
                     counter_ttest += 1
 
         # --- Adjust axis ---
-        n_rows = counter_ttest + max(0, counter_anova - counter_ttest)
-        min_y = original_min - ttest_anova_row_height * (n_rows + 1)
-        # Use dtick + tickformat for float ticks
-        fig.update_layout(yaxis=dict(
-            range=[min_y, original_max],
-            dtick=yaxis_step,
-            tickformat='.2f'
-        ))
+        if counter_ttest:
+            n_rows = counter_ttest + max(0, counter_anova - counter_ttest)
+            min_y = original_min - ttest_anova_row_height * (n_rows + 1)
+            # Use dtick + tickformat for float ticks
+            fig.update_layout(yaxis=dict(
+                range=[min_y, original_max],
+                dtick=yaxis_step,
+                tickformat='.2f'
+            ))
 
     def save_stats_csv(self, t, p_values, name_file):
         """Save results of statistical test in csv.
@@ -1208,7 +1214,7 @@ class HMD_helper:
         for label in all_labels:
             vid = mapping.loc[mapping["display_name"] == label, "video_id"].values[0]
             if vid == self.test_trial:
-                custom_line_dashes.append("dash")
+                custom_line_dashes.append("dot")
             else:
                 custom_line_dashes.append("solid")
 
@@ -1219,7 +1225,8 @@ class HMD_helper:
             y_legend_kp=all_labels,
             yaxis_range=yaxis_range,
             xaxis_range=xaxis_range,
-            xaxis_title=xaxis_title,  # type: ignore
+            xaxis_title=xaxis_title,
+            yaxis_title=yaxis_title,
             xaxis_title_offset=-0.04,  # type: ignore
             yaxis_title_offset=0.18,  # type: ignore
             name_file=f"all_videos_kp_slider_plot_{column_name}",
@@ -1233,6 +1240,7 @@ class HMD_helper:
             ttest_anova_row_height=4,
             ttest_annotations_font_size=common.get_configs("font_size") - 6,
             ttest_annotation_x=0.7,  # type: ignore
+            ttest_marker="circle",
             ttest_marker_size=common.get_configs("font_size"),
             legend_x=0,
             legend_y=1.225,
@@ -1251,7 +1259,8 @@ class HMD_helper:
             margin=margin
         )
 
-    def plot_yaw(self, mapping, column_name="Yaw", margin=None):
+    def plot_yaw(self, mapping, column_name="Yaw", xaxis_title=None, yaxis_title=None,
+                 xaxis_range=None, yaxis_range=None, margin=None):
         """
         Generate a comparison plot of keypress yaw data and subjective slider ratings
         for multiple video trials relative to a test condition.
@@ -1266,7 +1275,11 @@ class HMD_helper:
             mapping (pd.DataFrame): DataFrame with video metadata, including
                 'video_id', 'sound_clip_name', 'display_name', and 'colour'.
             column_name (str, optional): The matrix column to process (default "Yaw").
-            margin (dict, optional): Margin settings for plot layout.
+            xaxis_title (str, optional): Custom label for the x-axis.
+            yaxis_title (str, optional): Custom label for the y-axis.
+            xaxis_range (list, optional): x-axis [min, max] limits for the plot.
+            yaxis_range (list, optional): y-axis [min, max] limits for the plot.
+            margin (dict, optional): Custom plot margin dictionary.
         """
 
         # Filter out any 'test' or 'est' control videos from the mapping
@@ -1363,24 +1376,24 @@ class HMD_helper:
 
         # Choose line style: dashed for test trial, solid for others
         custom_line_dashes = []
-        for label in all_labels:
-            vid = mapping.loc[mapping["display_name"] == label, "video_id"].values[0]
-            if vid == self.test_trial:
-                custom_line_dashes.append("dash")
-            else:
-                custom_line_dashes.append("solid")
+        # for label in all_labels:
+        #     vid = mapping.loc[mapping["display_name"] == label, "video_id"].values[0]
+        #     if vid == self.test_trial:
+        #         custom_line_dashes.append("dot")
+        #     else:
+        #         custom_line_dashes.append("solid")
 
         # === Call central plotting function with all visualization & stats options ===
         self.plot_kp(
             df=combined_df,
             y=all_labels,
             y_legend_kp=all_labels,
-            xaxis_range=[0, 11],
-            yaxis_range=[0.03, 0.12],
-            xaxis_title="Time, [s]",
-            yaxis_title="Yaw angle, [radian]",
+            xaxis_range=xaxis_range,
+            yaxis_range=yaxis_range,
+            xaxis_title=xaxis_title,
+            yaxis_title=yaxis_title,
             xaxis_title_offset=-0.047,  # type: ignore
-            yaxis_title_offset=0.17,  # type: ignore
+            # yaxis_title_offset=0.17,  # type: ignore
             name_file=f"all_videos_yaw_angle_{column_name}",
             show_text_labels=True,
             pretty_text=True,
@@ -1388,7 +1401,7 @@ class HMD_helper:
             events_width=2,
             events_annotations_font_size=common.get_configs("font_size") - 6,
             stacked=False,
-            ttest_signals=ttest_signals,
+            # ttest_signals=ttest_signals,
             ttest_anova_row_height=0.01,
             ttest_annotations_font_size=common.get_configs("font_size") - 6,
             ttest_annotation_x=0.8,  # type: ignore
@@ -1396,7 +1409,7 @@ class HMD_helper:
             xaxis_step=1,
             yaxis_step=0.03,  # type: ignore
             legend_x=0,
-            legend_y=1.0,
+            legend_y=1.225,
             legend_columns=2,
             line_width=3,
             fig_save_width=1470,
