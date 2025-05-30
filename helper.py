@@ -1429,7 +1429,7 @@ class HMD_helper:
         )
 
     def plot_individual_csvs(self, csv_paths, mapping_df, font_size=None, color_dict=None, vertical_spacing=0.25,
-                             height=1300, width=1600):
+                             height=1500, width=1600, margin=dict(t=30, b=100, l=40, r=40)):
         """
         Plots individual participant responses from three CSV files as boxplots, with one subplot
         for each metric (Annoyance, Informativeness, Noticeability) and one for the composite score.
@@ -1456,6 +1456,7 @@ class HMD_helper:
             vertical_spacing (int, optional): Vertical spacing between subplots.
             height (int, optional): Height of plot.
             width (int, optional): Width of plot.
+            margin (dict, optional): Custom plot margin dictionary.
         """
         # todo: copy changes in attributes to the barplot.
 
@@ -1542,7 +1543,7 @@ class HMD_helper:
             font=dict(size=font_size or common.get_configs('font_size'), family=common.get_configs('font_family')),
             height=height,
             width=width,
-            margin=dict(t=25, b=100, l=40, r=40),
+            margin=margin,
             showlegend=False
         )
         fig.update_xaxes(tickangle=45)
