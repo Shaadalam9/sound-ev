@@ -1621,7 +1621,8 @@ class HMD_helper:
                         x=display_names,
                         y=means,
                         # name=subplot_titles[i],
-                        showlegend=False
+                        showlegend=False,
+                        marker_color=all_colors,
                     ),
                     row=row,
                     col=col

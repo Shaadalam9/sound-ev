@@ -7,12 +7,12 @@ no,video_id,yielding,eHMIOn,distPed,p1,p2,camera,group,video_length,sound_clip_n
 16,trial_15,0,0,3,0,0,1,1,11000,tone_2000Hz_SPL90dB_V_30kmh_emitted,Pure tone (cont.) 2000 Hz,#CC6677
 8,trial_7,0,0,3,0,0,1,1,11000,discrete_tone_350Hz_SPL90dB_V_30kmh_emitted,Pure tone (int.) 350 Hz,#88CCEE
 9,trial_8,0,0,3,0,0,1,1,11000,discrete_tone_500Hz_SPL90dB_V_30kmh_emitted,Pure tone (int.) 500 Hz,#661100
-2,trial_1,0,0,3,0,0,1,1,11000,beeps_medium_SPL90dB_V_30kmh_emitted,Beeps medium,#6699CC
 10,trial_9,0,0,3,0,0,1,1,11000,discrete_tone_1000Hz_SPL90dB_V_30kmh_emitted,Pure tone (int.) 1000 Hz,#DDCC77
 11,trial_10,0,0,3,0,0,1,1,11000,discrete_tone_2000Hz_SPL90dB_V_30kmh_emitted,Pure tone (int.) 2000 Hz,#882255
 3,trial_2,0,0,3,0,0,1,1,11000,combined_tone_350Hz_SPL90dB_V_30kmh_emitted,Comb. tone (cont.) 350 Hz,#332288
 4,trial_3,0,0,3,0,0,1,1,11000,combined_tone_500Hz_SPL90dB_V_30kmh_emitted,Comb. tone (cont.) 500 Hz,#888888
 6,trial_5,0,0,3,0,0,1,1,11000,combined_tone_2000Hz_SPL90dB_V_30kmh_emitted,Comb. tone (cont.) 2000 Hz,#E69F00
 5,trial_4,0,0,3,0,0,1,1,11000,combined_tone_1000Hz_SPL90dB_V_30kmh_emitted,Comb. tone (cont.) 1000 Hz,#56B4E9
+2,trial_1,0,0,3,0,0,1,1,11000,beeps_medium_SPL90dB_V_30kmh_emitted,Double beeps,#6699CC
 7,trial_6,0,0,3,0,0,1,1,11000,diesel_SPL90dB_V_30kmh_emitted,Diesel engine,#AA4499
 12,trial_11,0,0,3,0,0,1,1,11000,nothing_SPL90dB_V_30kmh_emitted,Tyres,#F0E442
