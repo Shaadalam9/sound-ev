@@ -1489,9 +1489,9 @@ class HMD_helper:
 
         # Compute composite score from annoyance, informativeness, noticeability
         max_scale = 10
-        annoyance = all_data[0]
+        annoyance = all_data[2]
         info = all_data[1]
-        notice = all_data[2]
+        notice = all_data[0]
 
         non_annoyance = max_scale - annoyance
         z_annoyance = zscore(non_annoyance, axis=0)
@@ -1504,7 +1504,7 @@ class HMD_helper:
         plot_data = all_data + [composite]
 
         # Define subplot layout and titles
-        subplot_titles = ['Annoyance', 'Informativeness', 'Noticeability', 'Composite score']
+        subplot_titles = ['Noticeability', 'Informativeness', 'Annoyance', 'Composite score']
 
         fig = make_subplots(rows=2, cols=2, subplot_titles=subplot_titles, vertical_spacing=vertical_spacing)
 
@@ -1536,6 +1536,20 @@ class HMD_helper:
                     col=col
                 )
 
+                # Compute and plot mean markers
+                mean_y = [df_metric[col].mean() for col in sorted_internal_names]
+                fig.add_trace(
+                    go.Scatter(
+                        x=sorted_display_names,
+                        y=mean_y,
+                        mode='markers',
+                        marker=dict(symbol='diamond', color='black', size=8),
+                        name='Mean',
+                        showlegend=(i == 0)  # Only show legend once
+                    ),
+                    row=row,
+                    col=col
+                )
             # fig.update_yaxes(range=[0, y_max], row=row, col=col)
 
         # Layout settings
@@ -1621,9 +1635,9 @@ class HMD_helper:
         display_names = [mapping_dict.get(col, col) for col in columns]
 
         # Compute Composite Score (z-score normalised average with inverted Annoyance)
-        annoyance = avgs[0]  # First CSV = Annoyance
+        annoyance = avgs[2]  # First CSV = Annoyance
         info = avgs[1]  # Second CSV = Informativeness
-        notice = avgs[2]  # Third CSV = Noticeability
+        notice = avgs[0]  # Third CSV = Noticeability
 
         max_scale = 10  # Assumed survey/rating scale maximum
         non_annoyance = max_scale - annoyance
@@ -1636,7 +1650,7 @@ class HMD_helper:
         composite_std = ((stds[0] + stds[1] + stds[2]) / 3).fillna(0)  # Optional, just for label
 
         # Prepare plot titles
-        subplot_titles = ['Annoyance', 'Informativeness', 'Noticeability', 'Composite score']
+        subplot_titles = ['Noticeability', 'Informativeness', 'Annoyance', 'Composite score']
 
         # Create 2x2 subplots
         fig = make_subplots(rows=2, cols=2, subplot_titles=subplot_titles, vertical_spacing=0.3)
