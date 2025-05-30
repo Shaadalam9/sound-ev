@@ -64,26 +64,26 @@ except Exception as e:
 if __name__ == "__main__":
     logger.info("Analysis started.")
 
-    # # Read and process data
-    # HMD.read_slider_data(data_folder, mapping, output_folder)
+    # Read and process data
+    HMD.read_slider_data(data_folder, mapping, output_folder)
 
-    # # Keypress data
-    # HMD.plot_column(mapping,
-    #                 column_name="TriggerValueRight",
-    #                 xaxis_range=[0, 11],
-    #                 yaxis_range=[0, 100],
-    #                 xaxis_title="Time, [s]",
-    #                 yaxis_title="Percentage of trials with trigger key pressed",
-    #                 margin=dict(l=120, r=2, t=12, b=12))
+    # Keypress data
+    HMD.plot_column(mapping,
+                    column_name="TriggerValueRight",
+                    xaxis_range=[0, 11],
+                    yaxis_range=[0, 100],
+                    xaxis_title="Time, [s]",
+                    yaxis_title="Percentage of trials with trigger key pressed",
+                    margin=dict(l=120, r=2, t=12, b=12))
 
-    # # Head rotation
-    # HMD.plot_yaw(mapping,
-    #              xaxis_range=[0, 11],
-    #              yaxis_range=[-0.06, 0.06],
-    #              xaxis_title="Time, [s]",
-    #              yaxis_title="Yaw angle, [radian]",
-    #              margin=dict(l=100, r=2, t=10, b=10))
-    # HMD.plot_yaw_histogram(mapping, angle=30, num_bins=30, smoothen_filter_param=True)
+    # Head rotation
+    HMD.plot_yaw(mapping,
+                 xaxis_range=[0, 11],
+                 yaxis_range=[-0.06, 0.06],
+                 xaxis_title="Time, [s]",
+                 yaxis_title="Yaw angle, [radian]",
+                 margin=dict(l=100, r=2, t=10, b=10))
+    HMD.plot_yaw_histogram(mapping, angle=30, num_bins=30, smoothen_filter_param=True)
 
     # Subjective responses
     HMD.plot_individual_csvs(csv_paths=["_output/slider_input_noticeability.csv",  # Noticeability
@@ -101,20 +101,20 @@ if __name__ == "__main__":
                                                 "_output/slider_input_annoyance.csv"],     # Annoyance
                                      mapping_df=mapping)
 
-    # # Information on participants
-    # HMD.plot_column_distribution(intake_questionnaire,
-    #                              intake_columns_to_plot,
-    #                              output_folder="output",
-    #                              save_file=True)
-    # HMD.plot_column_distribution(post_experiment_questionnaire,
-    #                              post_columns_to_plot,
-    #                              output_folder="output",
-    #                              save_file=True)
-    # HMD.distribution_plots(intake_questionnaire,
-    #                        intake_columns_distribution_to_plot,
-    #                        output_folder="output",
-    #                        save_file=True)
-    # HMD.distribution_plots(post_experiment_questionnaire,
-    #                        post_columns_distribution_to_plot,
-    #                        output_folder="output",
-    #                        save_file=True)
+    # Information on participants
+    HMD.plot_column_distribution(intake_questionnaire,
+                                 intake_columns_to_plot,
+                                 output_folder="output",
+                                 save_file=True)
+    HMD.plot_column_distribution(post_experiment_questionnaire,
+                                 post_columns_to_plot,
+                                 output_folder="output",
+                                 save_file=True)
+    HMD.distribution_plots(intake_questionnaire,
+                           intake_columns_distribution_to_plot,
+                           output_folder="output",
+                           save_file=True)
+    HMD.distribution_plots(post_experiment_questionnaire,
+                           post_columns_distribution_to_plot,
+                           output_folder="output",
+                           save_file=True)

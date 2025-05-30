@@ -1522,35 +1522,125 @@ class HMD_helper:
             col = (i % 2) + 1
             # y_max = 13 if i < 3 else df_metric.max().max() + 2
 
-            for j, colname in enumerate(sorted_internal_names):
+            # check for composite score
+            if i < 3:
+                for j, colname in enumerate(sorted_internal_names):
+                    fig.add_trace(
+                        go.Box(
+                            y=df_metric[colname],
+                            name=sorted_display_names[j],
+                            boxpoints='outliers',
+                            marker_color=all_colors[j],
+                            line=dict(width=2),
+                            showlegend=False
+                        ),
+                        row=row,
+                        col=col
+                    )
+
+                    # Compute and plot mean markers
+                    mean_y = [df_metric[col].mean() for col in sorted_internal_names]
+                    fig.add_trace(
+                        go.Scatter(
+                            x=sorted_display_names,
+                            y=mean_y,
+                            mode='markers',
+                            marker=dict(symbol='diamond', color='black', size=8),
+                            name='Mean',
+                            showlegend=(i == 0)  # Only show legend once
+                        ),
+                        row=row,
+                        col=col
+                    )
+
+        # Create mapping from internal sound clip names to display names
+        mapping_dict = dict(zip(mapping_df['sound_clip_name'], mapping_df['display_name']))
+
+        avgs, stds, all_columns_sets = [], [], []
+
+        # Read and process each CSV file
+        for path in csv_paths:
+            df = pd.read_csv(path)
+            avg_row = df[df['participant_id'] == 'average']
+            if avg_row.empty:
+                raise ValueError(f"No 'average' row found in {path}")
+
+            # Exclude 'average' row to compute per-sound-clip std deviation
+            numeric_df = df[df['participant_id'] != 'average'].drop(columns='participant_id').astype(float)
+            std_row = numeric_df.std()
+            avg_row = avg_row.drop(columns='participant_id').iloc[0].astype(float)
+
+            avgs.append(avg_row)
+            stds.append(std_row)
+            all_columns_sets.append(set(numeric_df.columns))
+
+        # Find sound clips present in all three CSVs
+        common_cols = set.intersection(*all_columns_sets)
+
+        # Filter and sort mapping_df to retain and order only the common sound clips
+        mapping_df = mapping_df[mapping_df['sound_clip_name'].isin(common_cols)]
+        sorted_internal_names = mapping_df['sound_clip_name'].tolist()
+        sorted_display_names = mapping_df['display_name'].tolist()
+        mapping_dict = dict(zip(sorted_internal_names, sorted_display_names))
+
+        # Reorder averages and stds to match the mapping order
+        avgs = [avg[sorted_internal_names] for avg in avgs]
+        stds = [std[sorted_internal_names] for std in stds]
+
+        columns = avgs[0].index.tolist()
+        display_names = [mapping_dict.get(col, col) for col in columns]
+
+        # Compute Composite Score (z-score normalised average with inverted Annoyance)
+        annoyance = avgs[2]  # First CSV = Annoyance
+        info = avgs[1]  # Second CSV = Informativeness
+        notice = avgs[0]  # Third CSV = Noticeability
+
+        max_scale = 10  # Assumed survey/rating scale maximum
+        non_annoyance = max_scale - annoyance
+
+        z_annoyance = zscore(non_annoyance)
+        z_info = zscore(info)
+        z_notice = zscore(notice)
+
+        composite = (z_annoyance + z_info + z_notice) / 3
+        composite_std = ((stds[0] + stds[1] + stds[2]) / 3).fillna(0)  # Optional, just for label
+
+        # Prepare data for each subplot: means and standard deviations
+        data_to_plot = [
+            (avgs[0], stds[0]),
+            (avgs[1], stds[1]),
+            (avgs[2], stds[2]),
+            (composite, composite_std)
+        ]
+
+        # Add each subplot's barplot
+        for i, (means, deviations) in enumerate(data_to_plot):
+            if i == 3:
                 fig.add_trace(
-                    go.Box(
-                        y=df_metric[colname],
-                        name=sorted_display_names[j],
-                        boxpoints='outliers',
-                        marker_color=all_colors[j],
-                        line=dict(width=2),
+                    go.Bar(
+                        x=display_names,
+                        y=means,
+                        # name=subplot_titles[i],
                         showlegend=False
                     ),
                     row=row,
                     col=col
                 )
 
-                # Compute and plot mean markers
-                mean_y = [df_metric[col].mean() for col in sorted_internal_names]
-                fig.add_trace(
-                    go.Scatter(
-                        x=sorted_display_names,
-                        y=mean_y,
-                        mode='markers',
-                        marker=dict(symbol='diamond', color='black', size=8),
-                        name='Mean',
-                        showlegend=(i == 0)  # Only show legend once
-                    ),
-                    row=row,
-                    col=col
-                )
-            # fig.update_yaxes(range=[0, y_max], row=row, col=col)
+                # Annotate each bar with mean and std (as text)
+                for x_val, y_val, m, d in zip(display_names, means, means, deviations):
+                    fig.add_annotation(
+                        text=f"{m:.2f} ({d:.2f})",
+                        x=x_val,
+                        y=y_val + 0.05,
+                        showarrow=False,
+                        textangle=-90,
+                        font=dict(size=20),
+                        xanchor='center',
+                        yanchor='bottom',
+                        row=row,
+                        col=col
+                    )
 
         # Layout settings
         fig.update_layout(
@@ -1809,4 +1899,4 @@ class HMD_helper:
         )
 
         # Save the generated plot using a helper function
-        self.save_plotly(fig, 'yaw_histogram_from_txts', save_final=True)
+        self.save_plotly(fig, 'yaw_histogram', save_final=True)
