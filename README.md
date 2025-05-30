@@ -2,7 +2,7 @@
 Framework for the analysis of different sounds emitted by an automated car while pedestrian is crossing the road.
 
 ## Citation
-If you use the coupled sim for academic work please cite the following papers:
+If you use the simulator for academic work please cite the following papers:
 
 > Bazilinskyy, P., Alam, M. S., & Martinez, R. M. (2025). Pedestrian crossing behaviour in front of electric vehicles emitting synthetic sounds: A virtual reality experiment. In 54th International Congress & Exposition on Noise Control Engineering (INTER-NOISE). São Paulo, Brazil.
 
