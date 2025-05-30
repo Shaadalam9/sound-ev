@@ -1428,7 +1428,8 @@ class HMD_helper:
             margin=margin
         )
 
-    def plot_individual_csvs(self, csv_paths, mapping_df, font_size=None, color_dict=None):
+    def plot_individual_csvs(self, csv_paths, mapping_df, font_size=None, color_dict=None, vertical_spacing=0.25,
+                             height=1300, width=1600):
         """
         Plots individual participant responses from three CSV files as boxplots, with one subplot
         for each metric (Annoyance, Informativeness, Noticeability) and one for the composite score.
@@ -1452,7 +1453,11 @@ class HMD_helper:
                                        used to map internal sound clip names to human-readable labels.
             font_size (int, optional): Font size for figure text.
             color_dict (dict, optional): Dictionary mapping display names to specific plot colors.
+            vertical_spacing (int, optional): Vertical spacing between subplots.
+            height (int, optional): Height of plot.
+            width (int, optional): Width of plot.
         """
+        # todo: copy changes in attributes to the barplot.
 
         if len(csv_paths) != 3:
             raise ValueError("Please provide exactly three CSV file paths.")
@@ -1500,7 +1505,7 @@ class HMD_helper:
         # Define subplot layout and titles
         subplot_titles = ['Annoyance', 'Informativeness', 'Noticeability', 'Composite score']
 
-        fig = make_subplots(rows=2, cols=2, subplot_titles=subplot_titles, vertical_spacing=0.25)
+        fig = make_subplots(rows=2, cols=2, subplot_titles=subplot_titles, vertical_spacing=vertical_spacing)
 
         # Set subplot title font sizes
         for annotation in fig['layout']['annotations']:  # type: ignore
@@ -1535,8 +1540,8 @@ class HMD_helper:
         # Layout settings
         fig.update_layout(
             font=dict(size=font_size or common.get_configs('font_size'), family=common.get_configs('font_family')),
-            height=1300,
-            width=1600,
+            height=height,
+            width=width,
             margin=dict(t=25, b=100, l=40, r=40),
             showlegend=False
         )
@@ -1546,8 +1551,8 @@ class HMD_helper:
         self.save_plotly(
             fig,
             'boxplot_response',
-            height=1300,
-            width=1600,
+            height=height,
+            width=width,
             save_final=True
         )
 
