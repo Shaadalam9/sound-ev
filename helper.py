@@ -34,7 +34,7 @@ class HMD_helper:
     # set template for plotly output
     template = common.get_configs('plotly_template')
     smoothen_signal = common.get_configs('smoothen_signal')
-    folder_figures = 'figures'  # subdirectory to save figures
+    folder_figures = common.get_configs('figures')  # subdirectory to save figures
     folder_stats = 'statistics'  # subdirectory to save statistical output
 
     def __init__(self):

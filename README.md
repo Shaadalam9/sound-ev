@@ -49,7 +49,7 @@ What is your primary mode of transportation?
 "About how many kilometers (miles) did you drive in the last 12 months?"
 
 ## Setup
-Tested with Python 3.9.20. To setup the environment run these two commands in a parent folder of the downloaded repository (replace `/` with `\` and possibly add `--user` if on Windows):
+Tested with Python 3.9.11. To setup the environment run these two commands in a parent folder of the downloaded repository (replace `/` with `\` and possibly add `--user` if on Windows):
 
 **Step 1:**  
 
@@ -79,21 +79,22 @@ python3 analysis.py
 ## Configuration of project
 Configuration of the project needs to be defined in `sound-ev/config`. Please use the `default.config` file for the required structure of the file. If no custom config file is provided, `default.config` is used. The config file has the following parameters:
 * `mapping`: CSV file that contains all data found in the videos.
-* `plotly_template`: template used to make graphs in the analysis.
-* `output`: folder with output.
-* `figures`: folder with final figures.
-* `data`: folder with data.
-* `intake_questionnaire`: data from intake questionnaire.
-* `post_experiment_questionnaire`: data from final questionnaire.
-* `kp_resolution`: bin size in ms in which keypress data is stored.
-* `yaw_resolution`: bin size in ms in which yaw data is stored..
-* `smoothen_signal`: toggle to apply filter to smoothen data.,
-* `freq`: frequency used by One Euro Filter.
-* `mincutoff`: minimal cutoff used by One Euro Filter.
-* `beta`: beta value used by One Euro Filter.
-* `font_family`: font family to be used on the figures.
-* `font_size`: font size to be used on the figures.
-* `p_value`: p value used for ttest.
+* `plotly_template`: Template used to make graphs in the analysis.
+* `output`: Directory where analysis results and intermediate output files will be saved.
+* `figures`: Directory where final figures and plots are stored.
+* `data`: Directory containing all raw and processed data files used in the analysis.
+* `intake_questionnaire`: CSV file containing participant responses from the intake (pre-experiment) questionnaire.
+* `post_experiment_questionnaire`: CSV file containing participant responses from the post-experiment questionnaire.
+* `compare_trial`: Reference trial against which all other trials are compared during t-tests in the analysis.
+* `kp_resolution`: Time bin size, in milliseconds, used for storing keypress data, which controls the resolution of keypress event logs.
+* `yaw_resolution`: Time bin size, in milliseconds, used for storing yaw (head rotation) data, controlling the resolution of HMD orientation data.
+* `smoothen_signal`:  Boolean toggle to enable or disable signal smoothing for data analysis.
+* `freq`: Frequency parameter used by the One Euro Filter for signal smoothing.
+* `mincutoff`: Minimum cutoff frequency for the One Euro Filter.
+* `beta`: Beta value controlling the speed-versus-smoothness tradeoff in the One Euro Filter.
+* `font_family`: Font family to be used in all generated figures for visual consistency.
+* `font_size`: Font size to be applied to all text in generated figures.
+* `p_value`: p-value threshold to be used for statistical significance testing (e.g., in t-tests).
 
 ## Input
 The simulator takes input from Meta Quest controller.
