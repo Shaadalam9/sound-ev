@@ -1,6 +1,6 @@
 no,video_id,yielding,eHMIOn,distPed,p1,p2,camera,group,video_length,sound_clip_name,display_name,colour
-0,est,0,0,3,0,0,1,1,0,pinknoise_testround,Test
-1,test,0,0,3,0,0,1,1,11000,pinknoise_testround,Test
+0,est,0,0,3,0,0,1,1,0,pinknoise_testround,Test,#FFFFFF
+1,test,0,0,3,0,0,1,1,11000,pinknoise_testround,Test,#FFFFFF
 13,trial_12,0,0,3,0,0,1,1,11000,tone_350Hz_SPL90dB_V_30kmh_emitted,Pure tone (cont.) 350 Hz,#117733
 14,trial_13,0,0,3,0,0,1,1,11000,tone_500Hz_SPL90dB_V_30kmh_emitted,Pure tone (cont.) 500 Hz,#999933
 15,trial_14,0,0,3,0,0,1,1,11000,tone_1000Hz_SPL90dB_V_30kmh_emitted,Pure tone (cont.) 1000 Hz,#44AA99
