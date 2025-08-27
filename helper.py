@@ -20,6 +20,7 @@ from tqdm import tqdm
 
 logger = CustomLogger(__name__)  # use custom logger
 template = common.get_configs("plotly_template")
+output_folder = common.get_configs("output")
 
 HMD_class = HMD_yaw()
 extra_class = Tools()
@@ -273,7 +274,7 @@ class HMD_helper:
         # disable mathjax globally for Kaleido
         pio.kaleido.scope.mathjax = None
         # build path
-        path = os.path.join(common.get_configs("output"), self.folder_figures)
+        path = os.path.join(output_folder, self.folder_figures)
         if not os.path.exists(path):
             os.makedirs(path)
         # build path for final figure
@@ -390,9 +391,7 @@ class HMD_helper:
             custom_line_dashes (list, optional): List of custom dash styles for each line.
             flag_trigger (bool, optional): If True, scale y values to percentages (multiply by 100).
             margin (dict, optional): Plotly layout margin dict (e.g., {'l':40, 'r':40, ...}) for fine control.
-
         """
-        # todo: update docstrings in all methods
 
         logger.info('Creating keypress figure.')
         # calculate times
@@ -723,7 +722,6 @@ class HMD_helper:
                 df = pd.read_csv(file_location)
 
                 # Filter the DataFrame to only include rows where Timestamp >= 0 and <= video_length
-                # todo: 0.01 hardcoded value does not work?
                 df = df[(df["Timestamp"] >= 0) & (df["Timestamp"] <= video_length + 0.01)]
 
                 # Round the Timestamp to the nearest multiple of resolution
@@ -771,7 +769,7 @@ class HMD_helper:
             avg_df = pd.DataFrame(avg_rows)
 
             # Save dataframe in the output folder
-            avg_df.to_csv(os.path.join(common.get_configs("output"), f"{video_id}_avg_df.csv"), index=False)
+            avg_df.to_csv(os.path.join(output_folder, f"{video_id}_avg_df.csv"), index=False)
 
     def draw_ttest_anova(self, fig, times, name_file, yaxis_range, yaxis_step, ttest_signals, ttest_marker,
                          ttest_marker_size, ttest_marker_colour, ttest_annotations_font_size, ttest_annotations_colour,
@@ -799,8 +797,6 @@ class HMD_helper:
             anova_annotations_colour (str): colour of annotations for ANOVA.
             ttest_anova_row_height (int): height of row of ttest/anova markers.
         """
-        # todo: anova support is broken after migration from original code
-        # todo: when no markers are to be shown, empty space is still added to the y axis
         # Save original axis limits
         original_min, original_max = yaxis_range
         # Counters for marker rows
@@ -821,7 +817,6 @@ class HMD_helper:
                 )  # type: ignore
 
                 # Save csv
-                # TODO: rounding to 2 is hardcoded and wrong?
                 times_csv = [round(i * resolution, 2) for i in range(len(comp['signal_1']))]
                 self.save_stats_csv(t=times_csv,
                                     p_values=p_vals,
@@ -830,7 +825,6 @@ class HMD_helper:
                 if any(sig):
                     xs, ys = [], []
                     # hardcoding margin from the x
-                    # todo: hardcoding value of margin
                     if flag_trigger:
                         y_offset = original_min - ttest_anova_row_height * (counter_ttest + 1) - 5
                     else:
@@ -845,7 +839,7 @@ class HMD_helper:
                         fig.add_annotation(
                             x=x,
                             y=y,
-                            text='*',  # TODO: use ttest_marker
+                            text='*',
                             showarrow=False,
                             yanchor='middle',
                             font=dict(family=common.get_configs("font_family"),
@@ -885,7 +879,7 @@ class HMD_helper:
             p_values (list): list of p values.
             name_file (str): name of file.
         """
-        path = os.path.join(common.get_configs("output"), self.folder_stats)  # where to save csv
+        path = os.path.join(output_folder, self.folder_stats)  # where to save csv
         # build path
         if not os.path.exists(path):
             os.makedirs(path)
@@ -979,7 +973,7 @@ class HMD_helper:
         Args:
             data_folder (str): Path to folder containing participant subfolders with CSVs.
             video_id (str): Target video identifier (e.g. '002', 'test', etc.).
-            output_file (str): Path to output CSV file (e.g. '_output/participant_trigger_002.csv').
+            output_file (str): Path to output CSV file (e.g. 'output/participant_trigger_002.csv').
             column_name (str): Name of the column to export (e.g. 'TriggerValueRight').
             mapping (pd.DataFrame): Mapping DataFrame containing at least 'video_id' and 'video_length'.
         """
@@ -1052,7 +1046,7 @@ class HMD_helper:
         Args:
             data_folder (str): Folder containing all participant data folders.
             video_id (str): Video identifier (e.g. '002', 'test', etc.).
-            output_file (str): Output CSV file path (e.g. '_output/participant_quat_002.csv').
+            output_file (str): Output CSV file path (e.g. 'output/participant_quat_002.csv').
             mapping (pd.DataFrame): DataFrame containing at least 'video_id' and 'video_length' columns.
         """
         participant_matrix = {}  # Store quaternions per participant per timestamp
@@ -1157,13 +1151,13 @@ class HMD_helper:
         self.export_participant_trigger_matrix(
             data_folder=data_folder,
             video_id=self.test_trial,
-            output_file=f"_output/participant_{column_name}_{self.test_trial}.csv",
+            output_file=os.path.join(output_folder, f"participant_{column_name}_{self.test_trial}.csv"),
             column_name=column_name,
             mapping=mapping
         )
 
         # Read matrix and extract time-series for the test trial
-        test_raw_df = pd.read_csv(f"_output/participant_{column_name}_{self.test_trial}.csv")
+        test_raw_df = pd.read_csv(os.path.join(output_folder, f"participant_{column_name}_{self.test_trial}.csv"))
         test_matrix = extra_class.extract_time_series_values(test_raw_df)
 
         # === Loop through each comparison trial ===
@@ -1175,13 +1169,13 @@ class HMD_helper:
             self.export_participant_trigger_matrix(
                 data_folder=data_folder,
                 video_id=video,
-                output_file=f"_output/participant_{column_name}_{video}.csv",
+                output_file=os.path.join(output_folder, f"participant_{column_name}_{video}.csv"),
                 column_name=column_name,
                 mapping=mapping
             )
 
             # Read and process the trigger matrix to extract time series for this trial
-            trial_raw_df = pd.read_csv(f"_output/participant_{column_name}_{video}.csv")
+            trial_raw_df = pd.read_csv(os.path.join(output_folder, f"participant_{column_name}_{video}.csv"))
             trial_matrix = extra_class.extract_time_series_values(trial_raw_df)
 
             # Compute participant-averaged time series (by timestamp) for this trial
@@ -1302,7 +1296,7 @@ class HMD_helper:
 
         # === Reference (test) trial: export yaw matrix and compute average yaw per timestamp ===
         test_video = self.test_trial
-        test_participant_csv = f"_output/participant_{column_name}_{test_video}.csv"
+        test_participant_csv = os.path.join(output_folder, f"participant_{column_name}_{test_video}.csv")
         self.export_participant_quaternion_matrix(
             data_folder=data_folder,
             video_id=test_video,
@@ -1311,20 +1305,20 @@ class HMD_helper:
         )
 
         # Compute average yaw for the reference (test) trial and save
-        test_yaw_csv = f"_output/yaw_avg_{test_video}.csv"
+        test_yaw_csv = os.path.join(output_folder, f"yaw_avg_{test_video}.csv")
         HMD_class.compute_avg_yaw_from_matrix_csv(
             input_csv=test_participant_csv,
             output_csv=test_yaw_csv
         )
         test_matrix = extra_class.all_yaws_per_bin(
-            input_csv=f"_output/participant_{column_name}_{self.test_trial}.csv"
+            input_csv=os.path.join(output_folder, f"participant_{column_name}_{self.test_trial}.csv")
         )
 
         # === Iterate through each video trial (excluding control/test) ===
         for video in plot_videos:
             # Get display name for current trial
             display_name = mapping.loc[mapping["video_id"] == video, "display_name"].values[0]
-            participant_csv = f"_output/participant_{column_name}_{video}.csv"
+            participant_csv = os.path.join(output_folder, f"participant_{column_name}_{video}.csv")
 
             # Export quaternion/yaw matrix for this trial
             self.export_participant_quaternion_matrix(
@@ -1335,7 +1329,7 @@ class HMD_helper:
             )
 
             # Compute avg yaw for this trial
-            yaw_csv = f"_output/yaw_avg_{video}.csv"
+            yaw_csv = os.path.join(output_folder, f"yaw_avg_{video}.csv")
             HMD_class.compute_avg_yaw_from_matrix_csv(
                 input_csv=participant_csv,
                 output_csv=yaw_csv
@@ -1347,12 +1341,12 @@ class HMD_helper:
 
             # Extract all per-bin yaw values (for saving and t-test)
             trial_matrix = extra_class.all_yaws_per_bin(
-                input_csv=f"_output/participant_{column_name}_{video}.csv"
+                input_csv=os.path.join(output_folder, f"participant_{column_name}_{video}.csv")
             )
 
             yaw_values = extra_class.flatten_trial_matrix(trial_matrix)
             yaw_values = yaw_values[~np.isnan(yaw_values)]  # Remove NaNs if present
-            trial_txt_path = f"_output/yaw_values_{video}.txt"
+            trial_txt_path = os.path.join(output_folder, f"yaw_values_{video}.txt")
             np.savetxt(trial_txt_path, yaw_values)
 
             # Prepare for t-test: compare each trial vs. test reference (exclude self-comparison)
@@ -1458,7 +1452,6 @@ class HMD_helper:
             width (int, optional): Width of plot.
             margin (dict, optional): Custom plot margin dictionary.
         """
-        # todo: copy changes in attributes to the barplot.
 
         if len(csv_paths) != 3:
             raise ValueError("Please provide exactly three CSV file paths.")
@@ -1811,7 +1804,7 @@ class HMD_helper:
                          width=1600,
                          save_final=True)
 
-    def plot_yaw_histogram(self, mapping, angle=180, data_folder='_output', num_bins=None,
+    def plot_yaw_histogram(self, mapping, angle=180, data_folder=output_folder, num_bins=None,
                            smoothen_filter_param=False):
         """
         Plots a histogram of average yaw angles for each trial across participants.
@@ -1824,7 +1817,7 @@ class HMD_helper:
             mapping (DataFrame): A data structure (e.g., pandas DataFrame) mapping trial identifiers to display names.
             angle (int, optional): The yaw angle range considered for the histogram, from -angle to +angle.
                 Default is 180.
-            data_folder (str, optional): Path to the folder containing the yaw angle data files. Default is '_output'.
+            data_folder (str, optional): Path to the folder containing the yaw angle data files. Default is 'output'.
             num_bins (int, optional): Number of bins for the histogram. If None, defaults to 2 * angle.
             smoothen_filter_param (bool, optional): Whether to smooth the yaw data using a filter
                 (e.g., OneEuroFilter).

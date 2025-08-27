@@ -83,38 +83,47 @@ if __name__ == "__main__":
                  xaxis_title="Time, [s]",
                  yaxis_title="Yaw angle, [radian]",
                  margin=dict(l=100, r=2, t=10, b=10))
+
     HMD.plot_yaw_histogram(mapping, angle=30, num_bins=30, smoothen_filter_param=True)
 
     # Subjective responses
-    HMD.plot_individual_csvs(csv_paths=["_output/slider_input_noticeability.csv",  # Noticeability
-                                        "_output/slider_input_info.csv",           # Informativeness
-                                        "_output/slider_input_annoyance.csv"],     # Annoyance
-                             mapping_df=mapping,
-                             font_size=30,
-                             vertical_spacing=0.27,
-                             height=1500,
-                             width=1600,
-                             margin=dict(t=40, b=100, l=10, r=10))
+    HMD.plot_individual_csvs(
+        csv_paths=[
+            os.path.join(output_folder, "slider_input_noticeability.csv"),  # Noticeability
+            os.path.join(output_folder, "slider_input_info.csv"),           # Informativeness
+            os.path.join(output_folder, "slider_input_annoyance.csv")       # Annoyance
+        ],
+        mapping_df=mapping,
+        font_size=30,
+        vertical_spacing=0.27,
+        height=1500,
+        width=1600,
+        margin=dict(t=40, b=100, l=10, r=10)
+    )
 
-    HMD.plot_individual_csvs_barplot(csv_paths=["_output/slider_input_noticeability.csv",  # Noticeability
-                                                "_output/slider_input_info.csv",           # Informativeness
-                                                "_output/slider_input_annoyance.csv"],     # Annoyance
-                                     mapping_df=mapping)
+    HMD.plot_individual_csvs_barplot(
+        csv_paths=[
+            os.path.join(output_folder, "slider_input_noticeability.csv"),  # Noticeability
+            os.path.join(output_folder, "slider_input_info.csv"),           # Informativeness
+            os.path.join(output_folder, "slider_input_annoyance.csv")       # Annoyance
+        ],
+        mapping_df=mapping
+    )
 
     # Information on participants
     HMD.plot_column_distribution(intake_questionnaire,
                                  intake_columns_to_plot,
-                                 output_folder="output",
+                                 output_folder=output_folder,
                                  save_file=True)
     HMD.plot_column_distribution(post_experiment_questionnaire,
                                  post_columns_to_plot,
-                                 output_folder="output",
+                                 output_folder=output_folder,
                                  save_file=True)
     HMD.distribution_plots(intake_questionnaire,
                            intake_columns_distribution_to_plot,
-                           output_folder="output",
+                           output_folder=output_folder,
                            save_file=True)
     HMD.distribution_plots(post_experiment_questionnaire,
                            post_columns_distribution_to_plot,
-                           output_folder="output",
+                           output_folder=output_folder,
                            save_file=True)
