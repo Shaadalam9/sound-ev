@@ -4,9 +4,9 @@ Framework for the analysis of different sounds emitted by an automated car while
 ## Citation
 If you use the simulator for academic work please cite the following papers:
 
-> Bazilinskyy, P., Alam, M. S., & Martinez, R. M. (2025). Pedestrian crossing behaviour in front of electric vehicles emitting synthetic sounds: A virtual reality experiment. In 54th International Congress & Exposition on Noise Control Engineering (INTER-NOISE). São Paulo, Brazil.
+> Bazilinskyy, P., Alam, M. S., & Martinez, R. M. (2025). Pedestrian crossing behaviour in front of electric vehicles emitting synthetic sounds: A virtual reality experiment. In 54th International Congress & Exposition on Noise Control Engineering (INTER-NOISE). São Paulo, Brazil. https://doi.org/10.3397/IN_2025_1076086
 
-> Bazilinskyy, P., Alam, M. S., & Martinez, R. M. (2025). Psychoacoustic assessment of synthetic sounds for electric vehicles in a virtual reality experiment. In 11th Convention of the European Acoustics Association (Euronoise). Málaga, Spain
+> Bazilinskyy, P., Alam, M. S., & Martinez, R. M. (2025). Psychoacoustic assessment of synthetic sounds for electric vehicles in a virtual reality experiment. In 11th Convention of the European Acoustics Association (Euronoise). Málaga, Spain. https://arxiv.org/abs/2510.25593
 
 ## Analysis
 Analysis can be started by running python `sound-ev/analysis.py`. A number of CSV files used for data processing are saved in `sound-ev/_output/`. Visualisations of all data are saved in `sound-ev/_output/figures/`.
