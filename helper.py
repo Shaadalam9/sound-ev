@@ -10,6 +10,7 @@ from OneEuroFilter import OneEuroFilter
 import common
 from custom_logger import CustomLogger
 import re
+import hashlib
 import numpy as np
 from scipy.stats import ttest_rel, ttest_ind
 from scipy.stats import zscore
@@ -38,8 +39,134 @@ class HMD_helper:
     folder_figures = common.get_configs('figures')  # subdirectory to save figures
     folder_stats = 'statistics'  # subdirectory to save statistical output
 
+    MAX_FILENAME_STEM_LENGTH = 22
+
+
+    # Explicit short names for figures that are referenced in the README.
+    # These make the generated filenames predictable instead of relying on hash-based names.
+    FILENAME_ALIASES = {
+        "all_videos_kp_slider_plot_triggervalueright": "keypress",
+        "all_videos_yaw_angle_yaw": "yaw_angle",
+        "yaw_histogram": "yaw_histogram",
+        "boxplot_response": "boxplot_response",
+        "bar_response": "bar_response",
+        "what_is_your_gender": "gender",
+        "what_is_your_age_in_years": "age",
+        "are_you_wearing_any_seeing_aids_during_the_experiments": "seeing_aids",
+        "how_often_in_the_last_month_have_you_experienced_virtual_reality": "vr_experience",
+        "what_is_your_primary_mode_of_transportation": "transport_mode",
+        "on_average_how_often_did_you_drive_a_vehicle_in_the_last_12_months": "driving_frequency",
+        "about_how_many_kilometers_miles_did_you_drive_in_the_last_12_months": "driving_distance",
+        "how_many_accidents_were_you_involved_in_when_driving_a_car_in_the_last_3_years_please_include_all_accidents_regardless_of_how_they_were_caused_how_slight_they_were_or_where_they_happened": "accidents",
+        "how_often_do_you_do_the_following_becoming_angered_by_a_particular_type_of_driver_and_indicate_your_hostility_by_whatever_means_you_can": "hostile_driver",
+        "how_often_do_you_do_the_following_disregarding_the_speed_limit_on_a_motorway": "speed_motorway",
+        "how_often_do_you_do_the_following_disregarding_the_speed_limit_on_a_residential_road": "speed_residential",
+        "how_often_do_you_do_the_following_driving_so_close_to_the_car_in_front_that_it_would_be_difficult_to_stop_in_an_emergency": "close_following",
+        "how_often_do_you_do_the_following_racing_away_from_traffic_lights_with_the_intention_of_beating_the_driver_next_to_you": "racing_lights",
+        "how_often_do_you_do_the_following_sounding_your_horn_to_indicate_your_annoyance_with_another_road_user": "horn_annoyance",
+        "how_often_do_you_do_the_following_using_a_mobile_phone_without_a_hands_free_kit": "mobile_phone",
+        "the_type_of_sound_that_the_car_was_emitting_affected_my_decision_to_cross_the_road": "sound_affected_crossing",
+        "at_which_age_did_you_obtain_your_first_license_for_driving_a_car_or_motorcycle": "license_age",
+        "how_stressful_did_you_feel_during_the_experiment": "stress",
+        "how_anxious_did_you_feel_during_the_experiment": "anxiety",
+        "how_realistic_did_you_find_the_experiment": "realism",
+        "how_would_you_rate_your_overall_experience_in_this_experiment": "overall_experience",
+    }
+
     def __init__(self):
         self.test_trial = common.get_configs("compare_trial")
+        self._reserved_filename_stems = set()
+        self._reserved_filenames = set()
+
+    @staticmethod
+    def _safe_filename_stem(name):
+        """Return a filesystem-safe filename stem from a string without an extension."""
+        stem = os.path.basename(str(name))
+        stem = stem.strip().lower()
+        stem = re.sub(r'[^a-z0-9._-]+', '_', stem)
+        stem = re.sub(r'_+', '_', stem).strip('._-')
+        return stem or "figure"
+
+    @classmethod
+    def _short_filename_stem(cls, name, max_length=None):
+        """Return a short, safe, and stable filename stem."""
+        max_length = max_length or cls.MAX_FILENAME_STEM_LENGTH
+        stem = cls._safe_filename_stem(name)
+
+        alias = cls.FILENAME_ALIASES.get(stem)
+        if alias:
+            alias_stem = cls._safe_filename_stem(alias)
+            if len(alias_stem) <= max_length:
+                return alias_stem
+            return alias_stem[:max_length].rstrip('._-') or "figure"
+
+        if len(stem) <= max_length:
+            return stem
+
+        digest = hashlib.sha1(stem.encode('utf-8')).hexdigest()[:8]
+        keep_length = max(1, max_length - len(digest) - 1)
+        shortened = stem[:keep_length].rstrip('._-')
+        return f"{shortened}_{digest}"
+
+    @classmethod
+    def _short_filename(cls, filename, max_length=None):
+        """Return a short filename while preserving its extension."""
+        stem, extension = os.path.splitext(os.path.basename(str(filename)))
+        return cls._short_filename_stem(stem, max_length=max_length) + extension.lower()
+
+    @classmethod
+    def _append_counter_to_stem(cls, stem, counter, max_length=None):
+        """Append a counter while keeping the stem within the length limit."""
+        max_length = max_length or cls.MAX_FILENAME_STEM_LENGTH
+        suffix = f"_{counter}"
+        keep_length = max(1, max_length - len(suffix))
+        trimmed_stem = stem[:keep_length].rstrip('._-')
+        return f"{trimmed_stem}{suffix}"
+
+    @staticmethod
+    def _filename_exists_in_any_directory(stem, directories, extensions):
+        """Check whether a filename stem already exists in any target directory."""
+        for directory in directories or []:
+            for extension in extensions or []:
+                if os.path.exists(os.path.join(directory, stem + extension)):
+                    return True
+        return False
+
+    def _unique_short_filename_stem(self, name, directories=None, extensions=None, max_length=None):
+        """Return a short filename stem that will not collide with already used or existing files."""
+        max_length = max_length or self.MAX_FILENAME_STEM_LENGTH
+        base_stem = self._short_filename_stem(name, max_length=max_length)
+        candidate = base_stem
+        counter = 2
+
+        while (candidate in self._reserved_filename_stems or
+               self._filename_exists_in_any_directory(candidate, directories, extensions)):
+            candidate = self._append_counter_to_stem(base_stem, counter, max_length=max_length)
+            counter += 1
+
+        self._reserved_filename_stems.add(candidate)
+        return candidate
+
+    def _unique_short_filename(self, filename, directories=None, max_length=None):
+        """Return a short filename with extension that will not collide with existing files."""
+        stem, extension = os.path.splitext(os.path.basename(str(filename)))
+        extension = extension.lower()
+        stem = self._unique_short_filename_stem(
+            stem,
+            directories=directories,
+            extensions=[extension],
+            max_length=max_length
+        )
+        candidate = stem + extension
+        counter = 2
+
+        while candidate in self._reserved_filenames:
+            stem = self._append_counter_to_stem(stem, counter, max_length=max_length)
+            candidate = stem + extension
+            counter += 1
+
+        self._reserved_filenames.add(candidate)
+        return candidate
 
     def smoothen_filter(self, signal, type_flter='OneEuroFilter'):
         """Smoothen list with a filter.
@@ -273,30 +400,59 @@ class HMD_helper:
         """
         # disable mathjax globally for Kaleido
         pio.kaleido.scope.mathjax = None
+        original_name = str(name)
         # build path
-        path = os.path.join(output_folder, self.folder_figures)
+        # `folder_figures` already points to the figures directory from the config.
+        # Do not append another "figures" folder, otherwise files end up in figures/figures.
+        path = self.folder_figures
         if not os.path.exists(path):
             os.makedirs(path)
-        # build path for final figure
-        path_final = os.path.join(common.get_configs("figures"), self.folder_figures)
-        if save_final and not os.path.exists(path_final):
+
+        # Keep this variable for the existing save_final logic, but avoid creating a duplicate folder.
+        path_final = self.folder_figures
+        save_final_copy = save_final and os.path.abspath(path_final) != os.path.abspath(path)
+        if save_final_copy and not os.path.exists(path_final):
             os.makedirs(path_final)
-        # limit name to max 200 char (for Windows)
-        if len(path) + len(name) > 195 or len(path_final) + len(name) > 195:
-            name = name[:200 - len(path) - 5]
+
+        target_directories = [path]
+        if save_final_copy:
+            target_directories.append(path_final)
+
+        # keep the complete path within a safe Windows-compatible length
+        longest_target_path = max(len(directory) for directory in target_directories)
+        max_path_length = 195 - longest_target_path - 5
+        max_stem_length = min(self.MAX_FILENAME_STEM_LENGTH, max(1, max_path_length))
+        save_extensions = []
+        if save_html:
+            save_extensions.append('.html')
+        if save_eps:
+            save_extensions.append('.eps')
+        if save_png:
+            save_extensions.append('.png')
+        if save_mp4:
+            save_extensions.append('.mp4')
+
+        name = self._unique_short_filename_stem(
+            name,
+            directories=target_directories,
+            extensions=save_extensions,
+            max_length=max_stem_length
+        )
+        if name != self._safe_filename_stem(original_name):
+            logger.info(f"Saving figure with short filename: {name}")
         # save as html
         if save_html:
             if open_browser:
                 # open in browser
                 py.offline.plot(fig, filename=os.path.join(path, name + '.html'))
                 # also save the final figure
-                if save_final:
+                if save_final_copy:
                     py.offline.plot(fig, filename=os.path.join(path_final, name + '.html'), auto_open=False)
             else:
                 # do not open in browser
                 py.offline.plot(fig, filename=os.path.join(path, name + '.html'), auto_open=False)
                 # also save the final figure
-                if save_final:
+                if save_final_copy:
                     py.offline.plot(fig, filename=os.path.join(path_final, name + '.html'), auto_open=False)
         # remove white margins
         if remove_margins:
@@ -305,13 +461,13 @@ class HMD_helper:
         if save_eps:
             fig.write_image(os.path.join(path, name + '.eps'), width=width, height=height)
             # also save the final figure
-            if save_final:
+            if save_final_copy:
                 fig.write_image(os.path.join(path_final, name + '.eps'), width=width, height=height)
         # save as png
         if save_png:
             fig.write_image(os.path.join(path, name + '.png'), width=width, height=height)
             # also save the final figure
-            if save_final:
+            if save_final_copy:
                 fig.write_image(os.path.join(path_final, name + '.png'), width=width, height=height)
         # save as mp4
         if save_mp4:
@@ -883,6 +1039,13 @@ class HMD_helper:
         # build path
         if not os.path.exists(path):
             os.makedirs(path)
+        max_path_length = 195 - len(path) - 5
+        max_stem_length = min(self.MAX_FILENAME_STEM_LENGTH, max(1, max_path_length))
+        name_file = self._unique_short_filename(
+            name_file,
+            directories=[path],
+            max_length=max_stem_length
+        )
         df = pd.DataFrame(columns=['t', 'p-value'])  # dataframe to save to csv
         df['t'] = t
         df['p-value'] = p_values

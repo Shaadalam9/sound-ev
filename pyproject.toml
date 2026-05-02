@@ -1,0 +1,18 @@
+[project]
+name = "sound-ev"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.9.11"
+dependencies = [
+    "kaleido==0.2.1",
+    "numpy==2.0.1",
+    "oneeurofilter==0.2.1",
+    "opencv-python==4.11.0.86",
+    "pandas==2.2.2",
+    "plotly==5.23.0",
+    "pycountry==24.6.1",
+    "scikit-learn==1.6.0",
+    "statsmodels==0.14.4",
+    "tqdm==4.66.5",
+]

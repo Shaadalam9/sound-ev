@@ -9,72 +9,143 @@ If you use the simulator for academic work please cite the following papers:
 > Bazilinskyy, P., Alam, M. S., & Martinez, R. M. (2025). Psychoacoustic assessment of synthetic sounds for electric vehicles in a virtual reality experiment. In 11th Convention of the European Acoustics Association (Euronoise). Málaga, Spain. https://arxiv.org/abs/2510.25593
 
 ## Analysis
-Analysis can be started by running python `sound-ev/analysis.py`. A number of CSV files used for data processing are saved in `sound-ev/_output/`. Visualisations of all data are saved in `sound-ev/_output/figures/`.
+Analysis can be started by running python `sound-ev/analysis.py`. A number of CSV files used for data processing are saved in `sound-ev/_output/`. Visualisations of all data are saved in `sound-ev/_output/figures/`. Download the response of the participants from https://doi.org/10.4121/629cae37-76e7-4b14-8693-25c96a263b4b.
 
 ## Keypress data
-[![Keypress](figures/all_videos_kp_slider_plot_TriggerValueRight.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/all_videos_kp_slider_plot_TriggerValueRight.html)
+[![Keypress](figures/keypress.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/keypress.html)
 Percentage of the participants who pressed the key (i.e. felt safe to cross in front of the EV) as a function of time for each sound stimulus. The vertical line represents the passing moment. The asterisks at the bottom indicate significant differences with respect to ’Diesel’ sound, p < 0.001.
 
 ## Head rotation
-[![Yaw angle](figures/all_videos_yaw_angle_Yaw.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/all_videos_yaw_angle_Yaw.html)
+[![Yaw angle](figures/yaw_angle.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/yaw_angle.html)
 Mean yaw angle of head movement of pedestrians as a function of time for each sound stimulus. The value of 0 denotes participants looking perpendicular to the road, negative values correspond to the left direction (vehicle approach) and vice versa. The vertical line represents the passing moment. The asterisks at the bottom indicate significant differences with respect to 'Diesel' sound, p < 0.001.
 
 [![Histogram of yaw angle](figures/yaw_histogram.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/yaw_histogram.html)
 Histogram of yaw angle of head movement of pedestrians as a function of time for each sound stimulus. The value of 0 denotes participants looking perpendicular to the road, negative values correspond to the left direction (vehicle approach) and vice versa.
 
 ## Subjective responses
-[![Barplot responses](figures/boxplot_response.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/boxplot_response.html)
-Bar plots of the ratings for the questions regarding (top left) noticeability, (top right) informativeness, (bottom left) annoyance, and composite score (bottom right) per sound stimulus
+[![Boxplot responses](figures/boxplot_response.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/boxplot_response.html)
+Box plots of the ratings for the questions regarding (top left) noticeability, (top right) informativeness, (bottom left) annoyance, and composite score (bottom right) per sound stimulus.
 
-[![Boxplot responses](figures/bar_response.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/bar_response.html)
-Box plots of the ratings for the questions regarding (top left) noticeability, (top right) informativeness, (bottom left) annoyance, and composite score (bottom right) per sound stimulus
+[![Barplot responses](figures/bar_response.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/bar_response.html)
+Bar plots of the ratings for the questions regarding (top left) noticeability, (top right) informativeness, (bottom left) annoyance, and composite score (bottom right) per sound stimulus.
 
 ## Information on participants
-[![Gender](figures/what_is_your_gender.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/what_is_your_gender.html)
+[![Gender](figures/gender.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/gender.html)
 Gender of the participants.
 
-[![Age](figures/what_is_your_age_(in_years).png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/what_is_your_age_(in_years).html)
+[![Age](figures/age.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/age.html)
 Age distribution of participants.
 
-[![Hearing Aid](figures/are_you_wearing_any_seeing_aids_during_the_experiments.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/are_you_wearing_any_seeing_aids_during_the_experiments.html)
+[![Hearing Aid](figures/seeing_aids.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/seeing_aids.html)
 Are you wearing any seeing aids during the experiments?
 
-[![License](figures/at_which_age_did_you_obtain_your_first_license_for_driving_a_car_or_motorcycle.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/at_which_age_did_you_obtain_your_first_license_for_driving_a_car_or_motorcycle.html)
+[![License](figures/license_age.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/license_age.html)
 At which age did you obtain your first license for driving a car or motorcycle?
 
-[![Transportation](figures/what_is_your_primary_mode_of_transportation.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/what_is_your_primary_mode_of_transportation.html)
+[![Transportation](figures/transport_mode.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/transport_mode.html)
 What is your primary mode of transportation?
 
-[![Driving](figures/about_how_many_kilometers_(miles)_did_you_drive_in_the_last_12_months.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/about_how_many_kilometers_(miles)_did_you_drive_in_the_last_12_months.html)
+[![Driving](figures/driving_distance.png?raw=true)](https://htmlpreview.github.io/?https://github.com/Shaadalam9/sound-ev/blob/main/figures/driving_distance.html)
 "About how many kilometers (miles) did you drive in the last 12 months?"
 
+
 ## Setup
-Tested with Python 3.9.11. To setup the environment run these two commands in a parent folder of the downloaded repository (replace `/` with `\` and possibly add `--user` if on Windows):
+[![Python Version](https://img.shields.io/badge/python-3.9.11-blue.svg)](https://www.python.org/downloads/release/python-3919/)
+[![Package Manager: uv](https://img.shields.io/badge/package%20manager-uv-green)](https://docs.astral.sh/uv/)
+Tested with **Python 3.9.11** and the [`uv`](https://docs.astral.sh/uv/) package manager.  
+Follow these steps to set up the project.
 
-**Step 1:**  
+**Step 1:** Install `uv`. `uv` is a fast Python package and environment manager. Install it using one of the following methods:
 
-Clone the repository
+**macOS / Linux (bash/zsh):**
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+**Windows (PowerShell):**
+```powershell
+irm https://astral.sh/uv/install.ps1 | iex
+```
+
+**Alternative (if you already have Python and pip):**
+```bash
+pip install uv
+```
+
+**Step 2:** Fix permissions (if needed):t
+
+Sometimes `uv` needs to create a folder under `~/.local/share/uv/python` (macOS/Linux) or `%LOCALAPPDATA%\uv\python` (Windows).  
+If this folder was created by another tool (e.g. `sudo`), you may see an error like:
+```lua
+error: failed to create directory ... Permission denied (os error 13)
+```
+
+To fix it, ensure you own the directory:
+
+### macOS / Linux
+```bash
+mkdir -p ~/.local/share/uv
+chown -R "$(id -un)":"$(id -gn)" ~/.local/share/uv
+chmod -R u+rwX ~/.local/share/uv
+```
+
+### Windows
+```powershell
+# Create directory if it doesn't exist
+New-Item -ItemType Directory -Force "$env:LOCALAPPDATA\uv"
+
+# Ensure you (the current user) own it
+# (usually not needed, but if permissions are broken)
+icacls "$env:LOCALAPPDATA\uv" /grant "$($env:UserName):(OI)(CI)F"
+```
+
+**Step 3:** After installing, verify:
+```bash
+uv --version
+```
+
+**Step 4:** Clone the repository:
 ```command line
 git clone https://github.com/Shaadalam9/sound-ev
+cd sound-ev
 ```
 
-**Step 2:** 
-
-Install Dependencies
+**Step 5:** Ensure correct Python version. If you don’t already have Python 3.9.11 installed, let `uv` fetch it:
 ```command line
-pip install -r requirements.txt
+uv python install 3.9.11
+```
+The repo should contain a .python-version file so `uv` will automatically use this version.
+
+**Step 6:** Create and sync the virtual environment. This will create **.venv** in the project folder and install dependencies exactly as locked in **uv.lock**:
+```command line
+uv sync --frozen
 ```
 
-**Step 3:**
+**Step 7:** Activate the virtual environment:
 
-Ensure you have the required datasets in the data/ directory.
+**macOS / Linux (bash/zsh):**
+```bash
+source .venv/bin/activate
+```
 
-**Step 4:**
+**Windows (PowerShell):**
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
 
-Run the code:
+**Windows (cmd.exe):**
+```bat
+.\.venv\Scripts\activate.bat
+```
+
+**Step 8:** Ensure that dataset are present. Place required datasets (including **mapping.csv**) into the **data/** directory:
+
+
+**Step 9:** Run the code:
 ```command line
 python3 analysis.py
 ```
+
 
 ## Configuration of project
 Configuration of the project needs to be defined in `sound-ev/config`. Please use the `default.config` file for the required structure of the file. If no custom config file is provided, `default.config` is used. The config file has the following parameters:
